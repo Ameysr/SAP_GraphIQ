@@ -154,7 +154,7 @@ CRITICAL RULES:
 - If aggregating amounts, compute from ALL records shown, not just a subset
 - Give a COMPLETE answer — include all relevant details from the data, don't just summarize counts
 - If a validation warning is present, mention it transparently in your answer
-- FORMATTING: Write in plain text only. Do NOT use any markdown — no ** bold **, no * italic *, no # headers, no backticks. Use numbered lists (1. 2. 3.) or plain prose. The output will be shown in a chat UI that does not render markdown.
+- FORMATTING: Use clean Markdown for readability. Use **bold** for key labels and important values, numbered lists (1. 2. 3.) or bullet points (- item) for multiple data points, and separate sections with line breaks. Keep it concise but well-structured. Do NOT use headers (#). Do NOT use code blocks.
 - Currency formatting scope:
   - Format amounts with currency ONLY for these fields: ${amountFieldsStr}
   - Do NOT format count fields (e.g. billingDocCount, deliveryItemCount, totalDocs, activeDocs) as currency.
@@ -213,12 +213,9 @@ ${resultsStr}
     nodesReferenced = [];
   }
 
-  // Strip any markdown formatting the LLM sneaks in
+  // Clean up: only strip headers (h1-h6) to keep markdown concise
   answer = answer
-    .replace(/\*\*/g, '')       // bold **text**
-    .replace(/(?<!\w)\*(?!\*)/g, '')  // italic *text* (but not **)
-    .replace(/^#{1,6}\s+/gm, '') // headers like ## Title
-    .replace(/`([^`]+)`/g, '$1') // inline code `text`
+    .replace(/^#{1,6}\s+/gm, '') // strip headers — use bold instead
     .trim();
 
   // Append disclaimer for low confidence

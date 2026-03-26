@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import type { ChatMessage } from '../types/index';
+import FormattedMessage from './FormattedMessage';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -71,7 +72,9 @@ export default function ChatPanel({ messages, isLoading, onSend }: ChatPanelProp
               <div className="message-avatar">⬡</div>
             )}
             <div className={`message-bubble ${msg.role} ${msg.confidence === 'low' ? 'low-confidence' : ''}`}>
-              <div className="message-content">{msg.content}</div>
+              <div className="message-content">
+                <FormattedMessage content={msg.content} />
+              </div>
               {msg.role === 'assistant' && msg.metadata && (
                 <div className="message-meta">
                   {msg.metadata.cacheHit ? '⚡ Cached' : `${msg.metadata.recordCount ?? 0} records`}
