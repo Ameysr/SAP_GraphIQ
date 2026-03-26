@@ -10,7 +10,12 @@ import { getRedis, closeRedis } from './redis.js';
 import { closeDriver, runQuery } from './db.js';
 import { getLLMStats } from './services/llm.js';
 
-dotenv.config({ path: '../.env' });
+// Load .env from project root in dev; in production (Render) env vars are injected natively
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: '../.env' });
+} else {
+  dotenv.config(); // no-op if no file exists — Render injects vars directly
+}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -18,7 +23,19 @@ const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
 
 // Middleware
 app.use(cors({
-  origin: [FRONTEND_URL, 'http://localhost:5173', 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    const allowed = [
+      FRONTEND_URL,
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+    // Allow all Vercel preview/production deployments
+    if (!origin || allowed.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'x-session-id'],
 }));
