@@ -1,7 +1,7 @@
 import { getRedis } from '../redis.js';
 import type { HistoryMessage, EntityMap } from '../types/index.js';
 
-const MAX_MESSAGES = 10;
+const MAX_MESSAGES = 20; // Allow 10 Q&A pairs (each pair = 2 messages: user + assistant)
 const HISTORY_TTL = 3600; // 1 hour
 const ENTITY_TTL = 3600;
 const MAX_ENTITY_TYPES = 3;
