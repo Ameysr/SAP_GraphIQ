@@ -1,0 +1,1037 @@
+{
+  "minSimilarity": 0.65,
+  "topK": 3,
+  "plans": [
+
+    {
+      "id": "plan-q1-entity-types-summary",
+      "critical": true,
+      "functionName": "getEntityTypesSummary",
+      "routingExamples": [
+        "How many distinct entity types (node types) exist in the SAP O2C dataset? List them.",
+        "How many node labels exist? List all entity types.",
+        "List distinct node types in the graph and the total count."
+      ],
+      "contract": {
+        "requiredFields": ["entityTypeCount", "entityTypes", "excludedTypes"]
+      }
+    },
+
+    {
+      "id": "plan-q4-soi-to-delivery-join-info",
+      "critical": true,
+      "functionName": "getSalesOrderItemToDeliveryItemJoinInfo",
+      "routingExamples": [
+        "Which graph edge connects a sales_order_item node to an outbound_delivery_item node, and what field is used as the join key?",
+        "What relationship connects SalesOrderItem to DeliveryItem and what are the join fields?",
+        "SalesOrderItem to DeliveryItem edge name and join key fields"
+      ],
+      "contract": {
+        "requiredFields": ["edgeType", "join"]
+      }
+    },
+
+    {
+      "id": "plan-bp-to-billingdocument-path",
+      "critical": true,
+      "functionName": "getBusinessPartnerToBillingDocumentPath",
+      "routingExamples": [
+        "Model the full path from a BusinessPartner node to a BillingDocument node. List every intermediate node type and the edge/field used at each hop.",
+        "Full path BusinessPartner to BillingDocument with intermediate nodes and joins",
+        "BusinessPartner -> BillingDocument traversal path with edges and join fields"
+      ],
+      "contract": {
+        "requiredFields": ["fromNode", "toNode", "paths"]
+      }
+    },
+
+    {
+      "id": "plan-schema-design-o2c",
+      "critical": true,
+      "functionName": "getO2CGraphSchemaDesign",
+      "routingExamples": [
+        "Design a property graph schema for the O2C process. Define node labels, key properties, and at least 6 relationship types with direction and cardinality.",
+        "Design the O2C graph schema: nodes, relationships, keys, cardinality",
+        "Property graph schema design for sales orders, deliveries, billing, payments"
+      ],
+      "contract": {
+        "requiredFields": ["nodes", "relationships", "propertyJoins"]
+      }
+    },
+
+    {
+      "id": "plan-analyze-billing-cancellation-anomaly",
+      "critical": true,
+      "functionName": "analyzeBillingCancellationAnomaly",
+      "routingExamples": [
+        "What anomaly exists in the relationship between billing_document_headers and billing_document_cancellations? How should a graph model handle this?",
+        "Anomaly between billing headers and billing cancellations",
+        "Why do cancellations not link cleanly to billing headers?"
+      ],
+      "contract": {
+        "requiredFields": ["cancellationNodes", "billingHeadersTotal", "cancelledHeadersFlagged", "headersLinkedByEdge", "cancellationWithoutEdgeCount"]
+      }
+    },
+
+    {
+      "id": "plan-profitcenter-to-products-trace",
+      "critical": true,
+      "functionName": "getProfitCenterToProductsTrace",
+      "routingExamples": [
+        "From journal_entry_items_accounts_receivable, all records belong to which profit center? Trace how this profit center connects back to a product via product_plants.",
+        "All journal entries belong to which profit center and how does it link to products via product plants",
+        "Profit center to product trace using product_plants"
+      ],
+      "contract": {
+        "requiredFields": ["profitCenter", "journalEntryCount", "productPlantRows", "sampleProductIds"]
+      }
+    },
+
+    {
+      "id": "plan-delivery-gm-status-a-vs-c",
+      "critical": true,
+      "functionName": "getDeliveryGoodsMovementStatusCounts",
+      "routingExamples": [
+        "How many outbound_delivery_headers have an overallGoodsMovementStatus of 'A' (not yet moved) vs 'C' (complete)?",
+        "DeliveryHeader overallGoodsMovementStatus A vs C count",
+        "Count deliveries by overallGoodsMovementStatus A and C"
+      ],
+      "contract": {
+        "requiredFields": ["status", "headerCount"]
+      }
+    },
+
+    {
+      "id": "plan-payments-collected-this-month",
+      "critical": true,
+      "functionName": "getPaymentsCollectedThisMonth",
+      "routingExamples": [
+        "How much revenue did we collect in payments this month?",
+        "payments collected this month total amount",
+        "cash collected this month from payments",
+        "revenue collected from payments (current month)"
+      ],
+      "contract": {
+        "requiredFields": ["month", "totalCollected", "currency"],
+        "checks": [{ "type": "range", "field": "totalCollected", "min": 0, "max": 1000000000000 }]
+      }
+    },
+
+    {
+      "id": "plan-sales-revenue-last-month",
+      "critical": true,
+      "functionName": "getSalesRevenueLastMonth",
+      "routingExamples": [
+        "What was our total sales revenue last month?",
+        "total sales revenue last month",
+        "sales revenue for last month (previous month)",
+        "revenue from sales orders last month"
+      ],
+      "contract": {
+        "requiredFields": ["month", "totalSalesRevenue", "currency"],
+        "checks": [{ "type": "range", "field": "totalSalesRevenue", "min": 0, "max": 1000000000000 }]
+      }
+    },
+
+    {
+      "id": "plan-orders-placed-by-customer",
+      "critical": true,
+      "functionName": "getOrdersPlacedByCustomer",
+      "routingExamples": [
+        "Show me all orders placed by customer 310000109.",
+        "Orders placed by customer",
+        "list orders for customer",
+        "which sales orders did the customer place"
+      ],
+      "contract": {
+        "requiredFields": ["customerName", "customerId", "orderCount", "orderIds", "currency"],
+        "checks": [{ "type": "range", "field": "orderCount", "min": 0, "max": 100000 }]
+      }
+    },
+
+    {
+      "id": "plan-products-stored-in-plant",
+      "critical": true,
+      "functionName": "getProductsStoredInPlant",
+      "routingExamples": [
+        "Which products are stored in plant WB05?",
+        "products stored in plant",
+        "show products in plant",
+        "list materials available in plant",
+        "what products does plant WB05 store"
+      ],
+      "contract": {
+        "requiredFields": ["productId", "productDescription"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-cancelled-invoices-summary",
+      "critical": true,
+      "functionName": "getCancelledInvoicesSummary",
+      "routingExamples": [
+        "Show me all cancelled invoices.",
+        "cancelled invoices total amount",
+        "total cancellation amount from cancelled invoices",
+        "billing cancellations summary"
+      ],
+      "contract": {
+        "requiredFields": ["cancelledDocsCount", "totalCancellationAmount", "currency", "sampleCancelledInvoiceDocIds", "sampleCancelledBillingDocs"],
+        "answerTemplate": "Found {{cancelledDocsCount}} cancelled invoices. Total cancellation amount: {{currency}} {{totalCancellationAmount}}. Sample cancelled invoice IDs: {{sampleCancelledInvoiceDocIds}}",
+        "checks": [{ "type": "range", "field": "totalCancellationAmount", "min": 0, "max": 1000000000000 }]
+      }
+    },
+
+    {
+      "id": "plan-so-to-delivery-and-billing-chain",
+      "critical": true,
+      "functionName": "traceSalesOrderToDeliveryAndBilling",
+      "routingExamples": [
+        "Trace the complete O2C document chain for sales order 740556: which outbound delivery document and which billing document does it map to? List all hop keys used.",
+        "For sales order 740556, which delivery document and billing document does it map to? show hop keys",
+        "Trace sales order to delivery and billing documents with join keys"
+      ],
+      "contract": {
+        "requiredFields": ["salesOrder", "deliveryDocuments", "billingDocuments", "hopKeys"]
+      }
+    },
+
+    {
+      "id": "plan-billing-items-by-delivery",
+      "critical": true,
+      "functionName": "getBillingItemsReferencingDelivery",
+      "routingExamples": [
+        "For delivery document 80738109, identify all billing document items that reference it. List billing document IDs and item numbers.",
+        "Billing items that reference delivery document 80738109",
+        "Which billing document items reference delivery 80738109"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "billingDocumentItem"]
+      }
+    },
+
+    {
+      "id": "plan-products-max-plant-coverage",
+      "critical": true,
+      "functionName": "getProductsWithMaxPlantCoverage",
+      "routingExamples": [
+        "How many products are available in all 44 plants (maximum plant coverage)? What does this imply about graph connectivity for those products?",
+        "Products available in all plants (max plant coverage) count and implication",
+        "How many products have maximum plant coverage"
+      ],
+      "contract": {
+        "requiredFields": ["maxPlantCount", "productCount", "sampleProductIds"]
+      }
+    },
+
+    {
+      "id": "plan-customer-billed-vs-paid-balance",
+      "critical": true,
+      "functionName": "getCustomerBilledVsPaidBalance",
+      "routingExamples": [
+        "For customer 320000083, compute total net billed amount from non-cancelled billing documents, compare to total payments, and outstanding balance.",
+        "Customer 320000083 billed vs paid balance",
+        "Outstanding balance for customer 320000083 (billed vs paid)"
+      ],
+      "contract": {
+        "requiredFields": ["customerId", "totalBilled", "totalPaid", "outstandingBalance", "currency"]
+      }
+    },
+
+    {
+      "id": "plan-q4-billing-doc-type-breakdown",
+      "critical": true,
+      "functionName": "getBillingDocTypeBreakdown",
+      "routingExamples": [
+        "What are the two billing document types in the dataset? How do F2 and S1 compare?",
+        "Billing document type breakdown F2 vs S1",
+        "How many F2 invoices vs S1 cancellation docs exist?",
+        "What types of billing documents are in the system?",
+        "Breakdown of billing docs by type with cancelled count"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocumentType", "totalCount", "cancelledCount", "totalNetAmount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-q5-active-billing-docs-totals",
+      "critical": true,
+      "functionName": "getActiveBillingTotals",
+      "routingExamples": [
+        "What percentage of all billing documents are active (not cancelled)? What is their combined total net amount?",
+        "Active billing docs share and total net amount",
+        "How many billing documents are active and what is the total active net amount?",
+        "percentage of billing documents that are not cancelled + combined active net amount",
+        "active (non-cancelled) billing document totals and percentage of all docs"
+      ],
+      "contract": {
+        "requiredFields": ["activeDocs", "totalDocs", "activePercentage", "activeTotalNetAmount", "currency"],
+        "checks": [
+          { "type": "range", "field": "activePercentage", "min": 0, "max": 100 }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-q6-top-month-active-revenue",
+      "critical": true,
+      "functionName": "getTopActiveBillingMonthRevenue",
+      "routingExamples": [
+        "Which month had the highest total active (non-cancelled) billing revenue? Amount and % of all active billing revenue",
+        "top month by active billing revenue + percentage share",
+        "highest active billed revenue month (non-cancelled) and what % it is of total active revenue",
+        "Which month has the biggest non-cancelled billed revenue and how much it represents",
+        "peak billing revenue month excluding cancellations"
+      ],
+      "contract": {
+        "requiredFields": ["month", "activeRevenueAmount", "activeRevenuePercentage", "activeRevenueTotal", "currency"],
+        "checks": [
+          { "type": "range", "field": "activeRevenuePercentage", "min": 0, "max": 100 }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-q7-plant-revenue-ranking",
+      "critical": true,
+      "functionName": "getPlantRevenueRanking",
+      "routingExamples": [
+        "Which plant processed the highest total billed revenue? Rank all plants by billing amount.",
+        "plant revenue ranking by billed revenue",
+        "Rank plants by total billed revenue (include only valid billed revenue)",
+        "Which plant has the highest billed revenue and list all plants by billed revenue",
+        "Top plants by billing revenue amount"
+      ],
+      "contract": {
+        "requiredFields": ["plantId", "plantName", "totalBilledRevenue", "billingDocCount", "deliveryItemCount", "currency"],
+        "checks": [
+          { "type": "monotonic", "field": "totalBilledRevenue", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-q9-unpaid-active-billing",
+      "critical": true,
+      "functionName": "getUnpaidActiveBillingDocs",
+      "routingExamples": [
+        "How many active (non-cancelled) billing documents have NOT been paid?",
+        "Unpaid active billing documents with total outstanding amount",
+        "Which non-cancelled invoices are still unpaid? Show customer breakdown",
+        "Outstanding unpaid billing docs that are not cancelled",
+        "Active invoices with no payment yet"
+      ],
+      "contract": {
+        "requiredFields": ["unpaidCount", "totalOutstandingAmount", "currency"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-revenue-concentration",
+      "critical": true,
+      "functionName": "getRevenueConcentration",
+      "routingExamples": [
+        "What is the revenue concentration across customers?",
+        "Revenue breakdown by customer with percentage share",
+        "Which customers contribute the most to total revenue?",
+        "Customer revenue concentration risk analysis",
+        "Show me how revenue is distributed across all customers"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "revenue", "percentage"],
+        "checks": [
+          { "type": "monotonic", "field": "revenue", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-payment-clearing-time",
+      "critical": false,
+      "functionName": "getPaymentClearingTime",
+      "routingExamples": [
+        "What is the payment clearing time for all invoices?",
+        "How long does it take to clear payments on billing documents?",
+        "Days between billing and payment clearing for each invoice",
+        "Payment clearing duration analysis",
+        "Show me invoice to payment clearing timeline"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "daysToClear"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-cancelled-after-payment",
+      "critical": true,
+      "functionName": "getCancelledAfterPayment",
+      "routingExamples": [
+        "Find billing documents that were cancelled after payment was already received",
+        "Which invoices were cancelled after being paid?",
+        "Cancelled after payment anomalies",
+        "Were any billing docs reversed after customer already paid?",
+        "Payment received but then invoice cancelled — find all"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "totalNetAmount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-full-anomaly-report",
+      "critical": true,
+      "functionName": "getFullAnomalyReport",
+      "routingExamples": [
+        "Give me a complete anomaly report for the O2C process",
+        "Full anomaly detection: undelivered, unbilled, unpaid, cancelled after payment",
+        "Run a health check on the entire order to cash pipeline",
+        "What are all the process anomalies in the system?",
+        "O2C anomaly detection report with all exceptions"
+      ],
+      "contract": {
+        "requiredFields": [],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-delivery-fulfillment-rate",
+      "critical": true,
+      "functionName": "getDeliveryFulfillmentRate",
+      "routingExamples": [
+        "What is the delivery fulfillment rate per customer?",
+        "How many ordered items were actually delivered for each customer?",
+        "Customer-wise delivery fulfillment percentage",
+        "Which customers have the lowest delivery rate?",
+        "Fulfillment rate analysis: ordered vs delivered items per customer"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "totalItems", "deliveredItems", "fulfillmentRate"],
+        "checks": [
+          { "type": "range", "field": "fulfillmentRate", "min": 0, "max": 100 }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-most-expensive-billing-item",
+      "critical": false,
+      "functionName": "getMostExpensiveBillingItem",
+      "routingExamples": [
+        "What is the most expensive billing item?",
+        "Find the highest value billing line items",
+        "Top billing items by net amount",
+        "Which billing items have the largest amounts?",
+        "Most costly invoice line items with product details"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "netAmount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-top-customers-by-orders",
+      "critical": false,
+      "functionName": "getTopCustomers",
+      "routingExamples": [
+        "Who are the top customers by order count?",
+        "Which customers placed the most orders?",
+        "Rank customers by number of sales orders",
+        "Top 10 customers by order volume",
+        "Customer ranking by total orders placed"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "orderCount"],
+        "checks": [
+          { "type": "monotonic", "field": "orderCount", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-top-customers-by-amount",
+      "critical": false,
+      "functionName": "getTopCustomers",
+      "routingExamples": [
+        "Who are the top customers by revenue amount?",
+        "Which customers have the highest billing totals?",
+        "Rank customers by total billed amount",
+        "Top customers by total order value",
+        "Highest spending customers"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "totalAmount"],
+        "checks": [
+          { "type": "monotonic", "field": "totalAmount", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-top-products",
+      "critical": false,
+      "functionName": "getTopProducts",
+      "routingExamples": [
+        "What are the top products by billing frequency?",
+        "Which products appear in the most billing documents?",
+        "Rank products by how often they are billed",
+        "Most frequently billed products",
+        "Top products by invoice count"
+      ],
+      "contract": {
+        "requiredFields": ["product", "billingCount"],
+        "checks": [
+          { "type": "monotonic", "field": "billingCount", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-journal-entry-distribution",
+      "critical": false,
+      "functionName": "getJournalEntryDistribution",
+      "routingExamples": [
+        "How are journal entries distributed between customers?",
+        "Journal entry breakdown per customer: debits vs credits",
+        "Which customers generate the most journal entries?",
+        "Customer-wise FI posting distribution",
+        "Show positive vs negative journal entries per customer"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "totalEntries", "positiveEntries", "negativeEntries", "netAmount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-payment-terms-split",
+      "critical": false,
+      "functionName": "getPaymentTermsSplit",
+      "routingExamples": [
+        "Which customers use payment terms Z001 vs Z009?",
+        "Payment terms split across customers",
+        "How are payment terms distributed across sales orders?",
+        "Z001 vs Z009 payment term analysis by customer",
+        "Customer payment term preferences"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "paymentTerm", "orderCount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-broken-flows-undelivered",
+      "critical": true,
+      "functionName": "findBrokenFlows",
+      "routingExamples": [
+        "Find orders that were never delivered",
+        "Which sales orders have no deliveries?",
+        "Undelivered orders in the system",
+        "Orders stuck without delivery fulfillment",
+        "Sales orders with missing delivery documents"
+      ],
+      "contract": {
+        "requiredFields": ["orderId", "undeliveredItems"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-broken-flows-unbilled",
+      "critical": true,
+      "functionName": "findBrokenFlows",
+      "routingExamples": [
+        "Find deliveries that were never billed",
+        "Which delivered orders have no billing documents?",
+        "Delivered but unbilled shipments",
+        "Delivery documents with no associated billing",
+        "Orders delivered but revenue not recognized"
+      ],
+      "contract": {
+        "requiredFields": ["deliveryId"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-customers-without-billing",
+      "critical": false,
+      "functionName": "getCustomersWithoutBilling",
+      "routingExamples": [
+        "Which customers have never been billed?",
+        "Find customers with no billing documents at all",
+        "Customers without any invoices",
+        "Customers who never had billing raised against them",
+        "Zero-billing customers in the system"
+      ],
+      "contract": {
+        "requiredFields": ["customerId", "customer"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-products-never-delivered",
+      "critical": false,
+      "functionName": "getProductsNeverDelivered",
+      "routingExamples": [
+        "Which products were ordered but never delivered?",
+        "Find products with zero deliveries despite being ordered",
+        "Products in orders but not in any delivery",
+        "Undelivered product catalog items",
+        "Products that have been sold but never shipped"
+      ],
+      "contract": {
+        "requiredFields": ["productId", "product"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-unpaid-invoices",
+      "critical": true,
+      "functionName": "getUnpaidInvoices",
+      "routingExamples": [
+        "Which invoices are unpaid?",
+        "Show me all unpaid billing documents",
+        "List outstanding invoices ordered by amount",
+        "Unpaid invoices sorted by highest amount first",
+        "Billing documents with no payment received"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "amount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-cancelled-docs",
+      "critical": false,
+      "functionName": "getCancelledDocs",
+      "routingExamples": [
+        "Which billing documents were cancelled?",
+        "Show me all cancelled invoices",
+        "List cancelled billing documents with details",
+        "Cancelled billing docs and their original amounts",
+        "Billing cancellations with associated deliveries"
+      ],
+      "contract": {
+        "requiredFields": ["originalDoc", "cancelDoc"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-customer-billing-summary",
+      "critical": false,
+      "functionName": "getCustomerBillingSummary",
+      "routingExamples": [
+        "Give me the full billing summary for customer 320000082",
+        "Customer financial summary: active, cancelled, paid, unpaid breakdown",
+        "Complete billing profile for a specific customer",
+        "How much has customer billed, paid, and outstanding?",
+        "Customer billing health report"
+      ],
+      "contract": {
+        "requiredFields": ["totalDocs", "activeDocs", "cancelledDocs"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-o2c-health-summary",
+      "critical": true,
+      "functionName": null,
+      "routingExamples": [
+        "Give me a full O2C health summary: orders, deliveries, billing, and payments",
+        "Overall order to cash pipeline health check",
+        "System-wide O2C summary statistics",
+        "Total orders, deliveries, invoices, and payments overview",
+        "High-level O2C process dashboard"
+      ],
+      "contract": {
+        "requiredFields": ["totalOrders", "totalDeliveries", "totalInvoices", "totalBilled", "totalPayments"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-ar-aging-buckets",
+      "critical": true,
+      "functionName": null,
+      "routingExamples": [
+        "Show AR aging buckets for all customers (0-30, 31-60, 61-90, 90+ days)",
+        "Accounts receivable aging analysis",
+        "Customer-wise AR aging report",
+        "How old are the unpaid invoices per customer?",
+        "Aging bucket distribution for outstanding receivables"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "aging_0_30", "aging_31_60", "aging_61_90", "aging_90plus"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-dso-per-customer",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What is the average days sales outstanding (DSO) per customer?",
+        "DSO analysis by customer",
+        "Which customers take the longest to pay?",
+        "Average payment duration per customer",
+        "Days sales outstanding report"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "avgDSO_days", "paidInvoices"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-credit-exposure",
+      "critical": true,
+      "functionName": null,
+      "routingExamples": [
+        "What is the open credit exposure per customer?",
+        "Customer credit risk from unpaid invoices",
+        "Total outstanding exposure by customer",
+        "Which customers owe the most money?",
+        "Open accounts receivable exposure analysis"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "totalExposure", "unpaidDocs"],
+        "checks": [
+          { "type": "monotonic", "field": "totalExposure", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-compare-customers",
+      "critical": false,
+      "functionName": "compareCustomerRevenue",
+      "routingExamples": [
+        "Compare revenue between customer 320000083 and 320000082",
+        "Head-to-head comparison of two customers",
+        "How do two customers compare in billing and revenue?",
+        "Customer A vs Customer B revenue comparison",
+        "Compare cancellation rates between two customers"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "revenue", "docCount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-cancellation-rate-by-customer",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What is the cancellation rate by customer?",
+        "Which customers have the highest billing cancellation rate?",
+        "Cancelled vs total billing documents percentage per customer",
+        "Customer cancellation rate analysis",
+        "Who cancels the most invoices proportionally?"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "totalDocs", "cancelledDocs", "cancellationRate"],
+        "checks": [
+          { "type": "monotonic", "field": "cancellationRate", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-currency-analysis",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What currencies are used across billing documents?",
+        "Currency distribution in billing",
+        "Which currencies appear in the invoices?",
+        "Multi-currency billing analysis",
+        "How many billing docs per currency?"
+      ],
+      "contract": {
+        "requiredFields": ["currency", "documentCount", "totalAmount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-blocked-customers-with-orders",
+      "critical": true,
+      "functionName": null,
+      "routingExamples": [
+        "Are there any blocked customers with active orders?",
+        "Blocked business partners who still have open sales orders",
+        "Find customers that are blocked but have existing orders",
+        "Risk: which blocked customers have pending orders?",
+        "Customers marked as blocked with active order value"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "orderCount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-customer-order-recency",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "Which customers have not placed orders in the last 6 months?",
+        "Inactive customers by last order date",
+        "Customers who stopped ordering recently",
+        "Dormant customer analysis by recency",
+        "Days since last order for each customer"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "lastOrderDate", "daysSinceLastOrder"],
+        "checks": [
+          { "type": "monotonic", "field": "daysSinceLastOrder", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-delivery-lead-time",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What is the average delivery lead time from order to delivery per customer?",
+        "How long does it take from order placement to delivery?",
+        "Order-to-delivery cycle time analysis",
+        "Average lead time per customer for deliveries",
+        "Delivery speed analysis by customer"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "avgLeadDays", "deliveries"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-overdue-deliveries",
+      "critical": true,
+      "functionName": null,
+      "routingExamples": [
+        "Which deliveries are overdue — confirmed date passed but not yet delivered?",
+        "Overdue delivery schedule lines",
+        "Find items past their confirmed delivery date with no actual delivery",
+        "Late deliveries analysis",
+        "Orders past due date without fulfillment"
+      ],
+      "contract": {
+        "requiredFields": ["salesOrder", "daysOverdue"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-high-value-orders",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "Show me orders with unusually high value (above 3x average)",
+        "Which sales orders have abnormally high amounts?",
+        "Outlier orders by value",
+        "Find high-value sales orders significantly above average",
+        "Flag orders that are much larger than typical"
+      ],
+      "contract": {
+        "requiredFields": ["orderId", "orderValue", "timesAvg"],
+        "checks": [
+          { "type": "monotonic", "field": "orderValue", "direction": "desc" }
+        ]
+      }
+    },
+
+    {
+      "id": "plan-debit-credit-totals",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What is the total debit vs credit amount across all journal entries?",
+        "Debit and credit summary from FI postings",
+        "Journal entry totals: debits, credits, and net balance",
+        "Overall financial posting balance",
+        "Sum of all debits and credits in the system"
+      ],
+      "contract": {
+        "requiredFields": ["totalDebits", "totalCredits", "netBalance"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-fi-posting-gaps",
+      "critical": true,
+      "functionName": null,
+      "routingExamples": [
+        "Which billing documents have no journal entries?",
+        "Find invoices without FI postings",
+        "Billing docs missing accounting document links",
+        "FI posting gap analysis",
+        "Invoices not posted to accounting"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "totalNetAmount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-single-customer-products",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "Which products are ordered by only one customer?",
+        "Single-customer products analysis",
+        "Products exclusive to a single buyer",
+        "Find products with only one ordering customer",
+        "Customer dependency risk: products sold to only one client"
+      ],
+      "contract": {
+        "requiredFields": ["productId", "product", "soloCustomerId"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-cross-domain-summary",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "For each customer show order count, delivery count, and billing total",
+        "Customer-level O2C summary with orders, deliveries, billing",
+        "Cross-domain customer summary",
+        "Complete customer activity overview",
+        "Customer scorecard: orders placed, items delivered, total billed"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "orders", "deliveries", "billingTotal"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-order-value-distribution",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What is the distribution of sales order values (min, max, avg)?",
+        "Sales order value distribution statistics",
+        "Order amount statistics: minimum, maximum, average, total",
+        "Statistical summary of order values",
+        "Order value range and central tendency"
+      ],
+      "contract": {
+        "requiredFields": ["orderCount", "minValue", "maxValue", "avgValue"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-delivery-status-breakdown",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What is the overall delivery status breakdown?",
+        "How many orders are in each delivery status?",
+        "Delivery status distribution across all orders",
+        "Order delivery status summary",
+        "Count of orders by delivery completion status"
+      ],
+      "contract": {
+        "requiredFields": ["status", "orderCount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-incoterms-analysis",
+      "critical": false,
+      "functionName": null,
+      "routingExamples": [
+        "What incoterms are used across sales orders?",
+        "Incoterms distribution in the system",
+        "Which shipping terms are most common?",
+        "Breakdown of incoterms classifications",
+        "Trade terms usage analysis"
+      ],
+      "contract": {
+        "requiredFields": ["incoterms", "orderCount"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-deliveries-not-billed",
+      "critical": true,
+      "functionName": "getDeliveriesNotBilled",
+      "routingExamples": [
+        "Which orders were delivered but never invoiced?",
+        "Which deliveries have no billing document?",
+        "Find deliveries that were shipped but never billed",
+        "Delivered but not invoiced — revenue leakage",
+        "Show me unbilled deliveries",
+        "Which delivery documents have no invoice?",
+        "Find goods that went out but were never billed"
+      ],
+      "contract": {
+        "requiredFields": ["deliveryDocument"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-order-to-payment-cycle",
+      "critical": true,
+      "functionName": "getOrderToPaymentCycleTime",
+      "routingExamples": [
+        "How long does it take from order to payment for each customer?",
+        "Who are our slowest payers?",
+        "Average order-to-cash cycle time per customer",
+        "Days from order creation to payment clearing",
+        "Customer DSO analysis",
+        "Order to payment turnaround time",
+        "Which customers take the longest to pay after placing an order?"
+      ],
+      "contract": {
+        "requiredFields": ["customer", "avgCycleDays"],
+        "checks": []
+      }
+    },
+
+    {
+      "id": "plan-payments-without-journal",
+      "critical": true,
+      "functionName": "getPaymentsWithoutJournalEntries",
+      "routingExamples": [
+        "Payments received but no journal entry posted",
+        "Money moved but books don't match",
+        "Reconciliation gaps between payments and journal entries",
+        "Which billing documents have payment but no FI posting?",
+        "Payments without corresponding accounting entries",
+        "Find unposted payments in the ledger"
+      ],
+      "contract": {
+        "requiredFields": ["billingDocument", "paymentAmount"],
+        "checks": []
+      }
+    }
+
+  ]
+}
