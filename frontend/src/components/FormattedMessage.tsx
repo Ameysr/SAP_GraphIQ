@@ -33,8 +33,8 @@ function formatContent(text: string): React.ReactNode[] {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Bullet list item: - item or * item
-    const bulletMatch = trimmed.match(/^[-*]\s+(.+)/);
+    // Bullet list item: - item or * item (but not ** which is bold)
+    const bulletMatch = trimmed.match(/^[-]\s+(.+)/);
     if (bulletMatch) {
       if (listType !== 'ul') {
         flushList();
@@ -63,10 +63,8 @@ function formatContent(text: string): React.ReactNode[] {
     flushList();
 
     if (trimmed === '') {
-      // Empty line → spacer
       elements.push(<div key={`sp-${globalKey++}`} className="formatted-spacer" />);
     } else {
-      // Regular paragraph
       elements.push(
         <p key={`p-${globalKey++}`} className="formatted-paragraph">
           {formatInline(trimmed)}
@@ -80,39 +78,70 @@ function formatContent(text: string): React.ReactNode[] {
 }
 
 /**
- * Converts **bold**, *italic*, and `code` within a line to React elements.
+ * Parse inline formatting: **bold**, `code`, *italic*
+ * Uses iterative string scanning instead of a single complex regex
  */
 function formatInline(text: string): React.ReactNode {
-  // Split into tokens: **bold**, `code`, *italic*, plain text
-  const regex = /(\*\*(.+?)\*\*|`([^`]+)`|\*(.+?)\*)/g;
   const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  let i = 0;
+  let plainStart = 0;
 
-  while ((match = regex.exec(text)) !== null) {
-    // Push text before the match
-    if (match.index > lastIndex) {
-      parts.push(text.substring(lastIndex, match.index));
+  while (i < text.length) {
+    // Check for **bold**
+    if (text[i] === '*' && text[i + 1] === '*') {
+      const closeIdx = text.indexOf('**', i + 2);
+      if (closeIdx !== -1) {
+        // Push any plain text before this
+        if (i > plainStart) {
+          parts.push(text.substring(plainStart, i));
+        }
+        const boldText = text.substring(i + 2, closeIdx);
+        parts.push(<strong key={`b-${globalKey++}`}>{boldText}</strong>);
+        i = closeIdx + 2;
+        plainStart = i;
+        continue;
+      }
     }
 
-    if (match[2]) {
-      // **bold**
-      parts.push(<strong key={`b-${globalKey++}`}>{match[2]}</strong>);
-    } else if (match[3]) {
-      // `code`
-      parts.push(<code key={`c-${globalKey++}`} className="inline-code">{match[3]}</code>);
-    } else if (match[4]) {
-      // *italic*
-      parts.push(<em key={`i-${globalKey++}`}>{match[4]}</em>);
+    // Check for `code`
+    if (text[i] === '`') {
+      const closeIdx = text.indexOf('`', i + 1);
+      if (closeIdx !== -1) {
+        if (i > plainStart) {
+          parts.push(text.substring(plainStart, i));
+        }
+        const codeText = text.substring(i + 1, closeIdx);
+        parts.push(<code key={`c-${globalKey++}`} className="inline-code">{codeText}</code>);
+        i = closeIdx + 1;
+        plainStart = i;
+        continue;
+      }
     }
 
-    lastIndex = regex.lastIndex;
+    // Check for *italic* (single *, not **)
+    if (text[i] === '*' && text[i + 1] !== '*') {
+      const closeIdx = text.indexOf('*', i + 1);
+      if (closeIdx !== -1 && text[closeIdx + 1] !== '*') {
+        if (i > plainStart) {
+          parts.push(text.substring(plainStart, i));
+        }
+        const italicText = text.substring(i + 1, closeIdx);
+        parts.push(<em key={`i-${globalKey++}`}>{italicText}</em>);
+        i = closeIdx + 1;
+        plainStart = i;
+        continue;
+      }
+    }
+
+    i++;
   }
 
-  // Push remaining text
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
+  // Push remaining plain text
+  if (plainStart < text.length) {
+    parts.push(text.substring(plainStart));
   }
 
-  return parts.length === 1 ? parts[0] : parts;
+  if (parts.length === 0) return text;
+  if (parts.length === 1) return parts[0];
+  return parts;
 }
