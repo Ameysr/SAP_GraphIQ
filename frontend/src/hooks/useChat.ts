@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatMessage, ChatResponse } from '../types/index';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
+const STORAGE_KEY = 'o2c_chat_history';
+const MAX_MESSAGES = 100; // Keep up to 100 messages (50 Q&A pairs)
 
 function getSessionId(): string {
   let id = localStorage.getItem('o2c_session_id');
@@ -13,15 +15,42 @@ function getSessionId(): string {
   return id;
 }
 
+function loadMessages(): ChatMessage[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored) as ChatMessage[];
+    }
+  } catch {
+    // Corrupted data — ignore
+  }
+  return [];
+}
+
+function saveMessages(messages: ChatMessage[]): void {
+  try {
+    // Keep only the last MAX_MESSAGES to avoid localStorage bloat
+    const toSave = messages.slice(-MAX_MESSAGES);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  } catch {
+    // localStorage full — ignore
+  }
+}
+
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [highlightedNodes, setHighlightedNodes] = useState<string[]>([]);
   const sessionId = getSessionId();
 
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    saveMessages(messages);
+  }, [messages]);
+
   const sendMessage = useCallback(async (text: string) => {
     const userMsg: ChatMessage = { role: 'user', content: text };
-    setMessages((prev) => [...prev.slice(-9), userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
     try {
@@ -48,7 +77,7 @@ export function useChat() {
         nodesReferenced: data.nodesReferenced,
       };
 
-      setMessages((prev) => [...prev.slice(-9), aiMsg]);
+      setMessages((prev) => [...prev, aiMsg]);
       setHighlightedNodes(data.nodesReferenced ?? []);
     } catch (err: unknown) {
       const errorMsg: ChatMessage = {
@@ -56,11 +85,16 @@ export function useChat() {
         content: 'Sorry, something went wrong. Please try again.',
         confidence: 'low',
       };
-      setMessages((prev) => [...prev.slice(-9), errorMsg]);
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
   }, [sessionId]);
 
-  return { messages, isLoading, sendMessage, highlightedNodes };
+  const clearHistory = useCallback(() => {
+    setMessages([]);
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  return { messages, isLoading, sendMessage, highlightedNodes, clearHistory };
 }

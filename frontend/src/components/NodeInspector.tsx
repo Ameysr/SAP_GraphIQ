@@ -18,19 +18,20 @@ export default function NodeInspector({ node, connections, onClose }: NodeInspec
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleGlobalMouseDown = (e: MouseEvent) => {
+    const handleGlobalPointerDown = (e: PointerEvent) => {
       if (isDragging.current) return;
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-        // Ignore clicks on the force-graph canvas if it's a node click (react-force-graph has internal bubbling).
-        // Standard close on outside click:
         onClose();
       }
     };
-    // Use a small timeout so the click that opened it doesn't instantly close it
-    setTimeout(() => {
-      window.addEventListener('mousedown', handleGlobalMouseDown);
-    }, 10);
-    return () => window.removeEventListener('mousedown', handleGlobalMouseDown);
+    // Delay listener attach so the click that OPENED the inspector doesn't instantly close it
+    const timerId = setTimeout(() => {
+      window.addEventListener('pointerdown', handleGlobalPointerDown, true);
+    }, 200);
+    return () => {
+      clearTimeout(timerId);
+      window.removeEventListener('pointerdown', handleGlobalPointerDown, true);
+    };
   }, [onClose]);
 
   const handleMouseDown = (e: React.MouseEvent) => {

@@ -29,7 +29,6 @@ export default function GraphView({ nodes, edges, highlightedNodes, onNodeClick 
   const [searchTerm, setSearchTerm] = useState('');
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const containerRef = useRef<HTMLDivElement>(null);
-  // Using 'any' for fgRef since react-force-graph types don't fully expose d3Force methods cleanly
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
 
@@ -69,7 +68,6 @@ export default function GraphView({ nodes, edges, highlightedNodes, onNodeClick 
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 0) {
       fgRef.current.d3Force('link').distance(40);
-      // Reduce repulsion distance so disconnected clusters don't repel each other indefinitely
       fgRef.current.d3Force('charge').strength(-50).distanceMax(200);
     }
   }, [graphData]);
@@ -83,7 +81,7 @@ export default function GraphView({ nodes, edges, highlightedNodes, onNodeClick 
   }, [highlightSet, searchLower]);
 
   const nodeSize = useCallback((node: ForceNode) => {
-    if (highlightSet.has(node.id)) return 8;
+    if (highlightSet.has(node.id)) return 10;
     if (searchLower && node.id.toLowerCase().includes(searchLower)) return 7;
     return 4;
   }, [highlightSet, searchLower]);
@@ -138,12 +136,50 @@ export default function GraphView({ nodes, edges, highlightedNodes, onNodeClick 
         nodeCanvasObjectMode={() => 'after'}
         nodeCanvasObject={(node: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
           const n = node as ForceNode;
-          if (globalScale > 2 || highlightSet.has(n.id)) {
+          const x = n.x ?? 0;
+          const y = n.y ?? 0;
+          const isHighlighted = highlightSet.has(n.id);
+
+          if (isHighlighted) {
+            // Clean highlight ring
+            ctx.beginPath();
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.strokeStyle = '#FF8C00';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            // Label with dark background pill
+            const fontSize = Math.max(11 / globalScale, 2.5);
+            ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            const label = n.id;
+            const textWidth = ctx.measureText(label).width;
+            const pad = 3 / globalScale;
+            const labelY = y + 9;
+
+            // Background pill
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.roundRect(
+              x - textWidth / 2 - pad,
+              labelY - pad,
+              textWidth + pad * 2,
+              fontSize + pad * 2,
+              2 / globalScale
+            );
+            ctx.fill();
+
+            // Text
+            ctx.fillStyle = '#FF8C00';
+            ctx.fillText(label, x, labelY);
+          } else if (globalScale > 2) {
             const fontSize = Math.max(10 / globalScale, 2);
             ctx.font = `${fontSize}px Inter, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillStyle = highlightSet.has(n.id) ? '#FF8C00' : 'rgba(255,255,255,0.7)';
-            ctx.fillText(n.id, n.x ?? 0, (n.y ?? 0) + 8 / globalScale);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.fillText(n.id, x, y + 8 / globalScale);
           }
         }}
       />

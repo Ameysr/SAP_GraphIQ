@@ -77,20 +77,8 @@ export default function ChatPanel({ messages, isLoading, onSend }: ChatPanelProp
               </div>
               {msg.role === 'assistant' && msg.metadata && (
                 <div className="message-meta">
-                  {msg.metadata.cacheHit ? '⚡ Cached' : `${msg.metadata.recordCount ?? 0} records`}
-                  {' · '}Tier {msg.metadata.tier}
-                  {msg.metadata.usedFallback && ' (Gemini fallback)'}
+                  {msg.metadata.cacheHit ? 'Cached' : `${msg.metadata.recordCount ?? 0} records`}
                   {' · '}{msg.metadata.latencyMs}ms
-                  {msg.metadata.activePlanId && (
-                    <>
-                      {' · '}Plan {msg.metadata.activePlanId}
-                    </>
-                  )}
-                  {msg.metadata.contractVerified !== undefined && msg.metadata.contractVerified !== null && (
-                    <>
-                      {' · '}Contract {msg.metadata.contractVerified ? 'OK' : 'FAIL'}
-                    </>
-                  )}
                 </div>
               )}
               {msg.confidence === 'low' && (
