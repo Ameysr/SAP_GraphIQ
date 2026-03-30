@@ -10,6 +10,7 @@ import * as aggregate from '../../functions/aggregate.js';
 import * as detect from '../../functions/detect.js';
 import * as compare from '../../functions/compare.js';
 import * as meta from '../../functions/meta.js';
+import * as analytics from '../../functions/analytics.js';
 
 // Map function names to actual implementations
 const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResult>> = {
@@ -80,7 +81,75 @@ const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResul
     const params = p as Record<string, string>;
     return meta.getSystemPipelineDescription(params.mentionedQuery, params.entities ? JSON.parse(params.entities) : undefined);
   },
+  // ── ANALYTICS (formerly null-function plans) ──
+  getO2CHealthSummary: () => analytics.getO2CHealthSummary(),
+  getARAgingBuckets: () => analytics.getARAgingBuckets(),
+  getDSOPerCustomer: () => analytics.getDSOPerCustomer(),
+  getCreditExposure: () => analytics.getCreditExposure(),
+  getCancellationRateByCustomer: () => analytics.getCancellationRateByCustomer(),
+  getCurrencyAnalysis: () => analytics.getCurrencyAnalysis(),
+  getBlockedCustomersWithOrders: () => analytics.getBlockedCustomersWithOrders(),
+  getCustomerOrderRecency: () => analytics.getCustomerOrderRecency(),
+  getDeliveryLeadTime: () => analytics.getDeliveryLeadTime(),
+  getOverdueDeliveries: () => analytics.getOverdueDeliveries(),
+  getHighValueOrders: () => analytics.getHighValueOrders(),
+  getDebitCreditTotals: () => analytics.getDebitCreditTotals(),
+  getFIPostingGaps: () => analytics.getFIPostingGaps(),
+  getSingleCustomerProducts: () => analytics.getSingleCustomerProducts(),
+  getCrossDomainSummary: () => analytics.getCrossDomainSummary(),
+  getOrderValueDistribution: () => analytics.getOrderValueDistribution(),
+  getDeliveryStatusBreakdown: () => analytics.getDeliveryStatusBreakdown(),
+  getIncotermsAnalysis: () => analytics.getIncotermsAnalysis(),
 };
+
+// ── SCHEMA-AWARE CYPHER VALIDATION ────────────────────────────────────────────
+// Validates generated Cypher against the known graph schema to catch errors
+// BEFORE execution, saving Neo4j round-trips and retry cycles.
+
+const VALID_NODE_LABELS = new Set([
+  'Customer', 'SalesOrder', 'SalesOrderItem', 'ScheduleLine', 'Product',
+  'DeliveryHeader', 'DeliveryItem', 'BillingHeader', 'BillingItem',
+  'BillingCancellation', 'JournalEntry', 'Payment', 'Plant', 'Address',
+  'CustomerCompany', 'CustomerSalesArea', 'ProductPlant',
+]);
+
+const VALID_RELATIONSHIPS = new Set([
+  'PLACED', 'HAS_ITEM', 'HAS_SCHEDULE_LINE', 'REFERENCES', 'FULFILLED_BY',
+  'PART_OF', 'AT_PLANT', 'BILLED_IN', 'POSTED_AS', 'PAID_BY', 'CANCELS',
+  'HAS_ADDRESS', 'ASSIGNED_TO_COMPANY', 'SELLS_THROUGH', 'STOCKED_AT', 'IN_PLANT',
+]);
+
+function validateCypherSchema(cypher: string): string[] {
+  const warnings: string[] = [];
+
+  // Check node labels — extract :LabelName patterns
+  const labelMatches = cypher.match(/:\s*([A-Z][a-zA-Z]+)/g) || [];
+  for (const match of labelMatches) {
+    const label = match.replace(/^:\s*/, '');
+    // Skip Neo4j built-in labels and type casts
+    if (['DISTINCT', 'NOT', 'NULL', 'WHERE', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'DESC', 'ASC', 'WITH', 'MATCH', 'RETURN', 'ORDER'].includes(label)) continue;
+    if (!VALID_NODE_LABELS.has(label)) {
+      warnings.push(`Unknown node label "${label}" — valid labels: ${[...VALID_NODE_LABELS].slice(0, 5).join(', ')}...`);
+    }
+  }
+
+  // Check relationship types — extract [:REL_TYPE] patterns
+  const relMatches = cypher.match(/\[(?:\w+)?:\s*([A-Z_]+)\]/g) || [];
+  for (const match of relMatches) {
+    const rel = match.match(/:\s*([A-Z_]+)/)?.[1];
+    if (rel && !VALID_RELATIONSHIPS.has(rel)) {
+      warnings.push(`Unknown relationship type "${rel}" — valid types: ${[...VALID_RELATIONSHIPS].slice(0, 5).join(', ')}...`);
+    }
+  }
+
+  // Check for sum/avg on string amount fields without toFloat()
+  const unsafeAggPattern = /(?:sum|avg)\s*\(\s*(?!toFloat)\s*\w+\.\s*(?:totalNetAmount|netAmount|amountInTransactionCurrency|totalAmount)\s*\)/gi;
+  if (unsafeAggPattern.test(cypher)) {
+    warnings.push('Amount field used in SUM/AVG without toFloat() — will produce string concatenation instead of arithmetic');
+  }
+
+  return warnings;
+}
 
 // ── CYPHER REASONING EXTRACTOR ────────────────────────────────────────────────
 // Parses LLM response that may contain both reasoning and cypher in JSON format.
@@ -174,10 +243,58 @@ export async function hybridExecutor(
   // PATH B & C: Template / Constrained Cypher generation with GraphRAG
   const isConstrained = state.pathTaken === 'constrained';
   const isRetry = state.retryCount > 0;
-  const tier = isConstrained ? 3 : 2;
+  const retryNum = state.retryCount;
+
+  // ── ESCALATING RETRY STRATEGY ──────────────────────────────────────────────
+  // Each retry tries a FUNDAMENTALLY different approach:
+  //   Attempt 0: Standard Cypher generation (Tier 2)
+  //   Retry 1:   Force CoT reasoning + more examples + explicit error analysis
+  //   Retry 2:   Escalate to Tier 3 (deepseek-reasoner) + simplified prompt
+  //   Retry 3:   Query decomposition — break into sub-queries
+  
+  // Retry 3: Try query decomposition as last resort
+  if (retryNum >= 3) {
+    console.log(`  [Executor] Retry #3 — attempting query decomposition`);
+    const { needsDecomposition: shouldDecompose, decomposeAndExecute } = await import('./queryDecomposer.js');
+    
+    try {
+      const decomposition = await decomposeAndExecute(
+        state.resolvedMessage,
+        state.extractedEntities as Record<string, string>
+      );
+      
+      if (decomposition.wasDecomposed && decomposition.mergedResults.length > 0) {
+        console.log(`  [Executor] Decomposition successful: ${decomposition.mergedResults.length} total results from ${decomposition.subQueries.length} sub-queries`);
+        return {
+          queryResults: decomposition.mergedResults,
+          confidence: 'medium',
+          queryError: null,
+          executedCypher: decomposition.subQueries.map(sq => sq.cypher).join('\n---\n'),
+        };
+      }
+
+      if (decomposition.errors.length > 0) {
+        console.log(`  [Executor] Decomposition errors: ${decomposition.errors.join('; ')}`);
+      }
+    } catch (err) {
+      console.log(`  [Executor] Decomposition failed: ${(err as Error).message}`);
+    }
+
+    return {
+      answer: "I wasn't able to find reliable data for this question after trying multiple approaches. Try breaking your question into simpler parts, e.g., ask about orders and payments separately.",
+      confidence: 'low',
+    };
+  }
+
+  // ── Determine tier and example count based on retry level ──
+  // Retry 0: Tier 2, 5 examples
+  // Retry 1: Tier 2 + CoT, 7 examples  
+  // Retry 2: Tier 3 (deepseek-reasoner), 7 examples + simplified approach
+  const tier = (retryNum >= 2 || isConstrained) ? 3 : 2;
+  const exampleCount = retryNum >= 1 ? 7 : 5;
 
   // ── GraphRAG: Retrieve similar examples + targeted schema ──
-  const ragContext = retrieveContext(state.resolvedMessage, 3);
+  const ragContext = await retrieveContext(state.resolvedMessage, exampleCount);
   console.log(`  [GraphRAG] Using schema subset (${ragContext.matchedExamples.length} examples) instead of full 135-line schema`);
 
   // ── BUILD SYSTEM PROMPT ──
@@ -216,9 +333,7 @@ ${ragContext.fewShotExamples}
 RELEVANT SCHEMA (ONLY use these node types and relationships):
 ${ragContext.schemaSubset}`;
 
-  // ── CHAIN-OF-THOUGHT (only for constrained/novel or retry paths) ──
-  // On normal template queries, CoT adds unnecessary tokens.
-  // On constrained/retry, it dramatically improves accuracy.
+  // ── CHAIN-OF-THOUGHT — always on for retries, constrained queries ──
   if (isConstrained || isRetry) {
     systemPrompt += `
 
@@ -233,25 +348,47 @@ Before writing your Cypher query, think step-by-step:
 Include your reasoning in the JSON response.`;
   }
 
-  // ── SELF-CORRECTION GUIDANCE (only on retry) ──
-  if (isRetry && state.queryError) {
+  // ── ESCALATING SELF-CORRECTION (different strategy per retry) ──
+  if (retryNum === 1 && state.queryError) {
+    // Retry 1: Detailed error analysis + forced different approach
     systemPrompt += `
 
-SELF-CORRECTION — YOUR PREVIOUS QUERY FAILED:
-Previous error: ${state.queryError}
-${state.executedCypher ? `Failed Cypher: ${state.executedCypher}` : ''}
+⚠️ RETRY #1 — YOUR FIRST QUERY ATTEMPT FAILED:
+Failed Cypher: ${state.executedCypher ?? 'unknown'}
+Error: ${state.queryError}
 
-CORRECTION PROTOCOL:
-1. DIAGNOSE: What exactly went wrong? (wrong property name? missing toFloat? wrong relationship direction? cartesian product?)
-2. ROOT CAUSE: Is it a schema issue, a logic issue, or a syntax issue?
-3. FIX STRATEGY: State specifically what you will change and why.
-4. NEW APPROACH: Write a fundamentally different query — do NOT make the same mistake again.
+DIAGNOSE THE ROOT CAUSE:
+- If "No results": You likely used wrong property names, wrong relationship direction, or a too-restrictive WHERE clause. Try OPTIONAL MATCH or looser filtering.
+- If "Type mismatch": You forgot toFloat() on a string amount field.
+- If "Unknown function": You used a window function (OVER). Replace with ORDER BY + LIMIT.
+- If "Schema validation": You used a node label or relationship that doesn't exist. Check the RELEVANT SCHEMA above.
 
-Common fixes:
-- "No results" usually means: wrong property name, wrong relationship direction, or too-restrictive WHERE clause
-- "Type mismatch" usually means: forgot toFloat() on a string amount field
-- "Unknown function" usually means: used a window function (OVER) — replace with ORDER BY + LIMIT
-- "cartesian product" means: missing WHERE clause connecting nodes, add proper join conditions`;
+MANDATORY: You MUST write a FUNDAMENTALLY DIFFERENT query. Do NOT make minor tweaks to the same pattern. Change your entire approach:
+- If you used a complex multi-hop join, try a simpler direct lookup
+- If you used property filtering, try relationship-based traversal
+- If you used an aggregation, try returning raw data first
+- Consider using OPTIONAL MATCH instead of MATCH for potentially missing relationships`;
+
+  } else if (retryNum === 2 && state.queryError) {
+    // Retry 2: Simplified approach (escalated to Tier 3 deepseek-reasoner)
+    systemPrompt += `
+
+🔴 RETRY #2 (FINAL ATTEMPT) — BOTH PREVIOUS QUERIES FAILED:
+Last failed Cypher: ${state.executedCypher ?? 'unknown'}
+Last error: ${state.queryError}
+
+YOU ARE NOW USING THE MOST POWERFUL MODEL. Write the simplest possible Cypher that captures the core of the user's question:
+1. Start with just 1-2 MATCH clauses (avoid deep joins)
+2. Use OPTIONAL MATCH for anything that might not exist
+3. Return only the most essential columns
+4. Add explicit toFloat() on ALL numeric-looking properties
+5. Use loose WHERE conditions
+
+SIMPLIFY AGGRESSIVELY:
+- If the question asks for "orders that were never delivered", just do:
+  MATCH (so:SalesOrder) WHERE NOT EXISTS { MATCH (so)-[:HAS_ITEM]->(:SalesOrderItem)-[:FULFILLED_BY]->(:DeliveryItem) }
+- If the question asks for "revenue by customer", just do:
+  MATCH (bh:BillingHeader) WHERE bh.billingDocumentIsCancelled = false RETURN bh.soldToParty AS customer, sum(toFloat(bh.totalNetAmount)) AS revenue ORDER BY revenue DESC`;
   }
 
   // ── RESPONSE FORMAT ──
@@ -272,7 +409,7 @@ Extracted entities: ${JSON.stringify(state.extractedEntities)}`;
       userPrompt,
       tier: tier as 1 | 2 | 3,
       maxTokens: isConstrained || isRetry ? 800 : 500,
-      callerTag: `cypher-gen-t${tier}${isRetry ? '-retry' + state.retryCount : ''}`,
+      callerTag: `cypher-gen-t${tier}${isRetry ? '-retry' + retryNum : ''}`,
     });
 
     // ── EXTRACT CYPHER + REASONING ──
@@ -299,10 +436,21 @@ Extracted entities: ${JSON.stringify(state.extractedEntities)}`;
       };
     }
 
+    // ── SCHEMA-AWARE VALIDATION ──
+    const schemaIssues = validateCypherSchema(result.cypher);
+    if (schemaIssues.length > 0 && state.retryCount < 3) {
+      console.log(`  [Executor] Schema issues: ${schemaIssues.join('; ')}`);
+      return {
+        retryCount: state.retryCount + 1,
+        queryError: `Schema validation issues: ${schemaIssues.join('; ')}. Fix these before running the query.`,
+        executedCypher: result.cypher,
+      };
+    }
+
     // Layer 5: Enforce size limit
     result.cypher = enforceSizeLimit(result.cypher);
 
-    console.log(`  [Executor] Generated Cypher: ${result.cypher}`);
+    console.log(`  [Executor] Generated Cypher (attempt ${retryNum}): ${result.cypher}`);
     const records = await runQuery(result.cypher, {});
 
     if (records.length === 0 && state.retryCount < 3) {
@@ -333,3 +481,4 @@ Extracted entities: ${JSON.stringify(state.extractedEntities)}`;
     };
   }
 }
+

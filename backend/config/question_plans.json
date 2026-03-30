@@ -2,7 +2,6 @@
   "minSimilarity": 0.65,
   "topK": 3,
   "plans": [
-
     {
       "id": "plan-q1-entity-types-summary",
       "critical": true,
@@ -13,10 +12,13 @@
         "List distinct node types in the graph and the total count."
       ],
       "contract": {
-        "requiredFields": ["entityTypeCount", "entityTypes", "excludedTypes"]
+        "requiredFields": [
+          "entityTypeCount",
+          "entityTypes",
+          "excludedTypes"
+        ]
       }
     },
-
     {
       "id": "plan-q4-soi-to-delivery-join-info",
       "critical": true,
@@ -27,10 +29,12 @@
         "SalesOrderItem to DeliveryItem edge name and join key fields"
       ],
       "contract": {
-        "requiredFields": ["edgeType", "join"]
+        "requiredFields": [
+          "edgeType",
+          "join"
+        ]
       }
     },
-
     {
       "id": "plan-bp-to-billingdocument-path",
       "critical": true,
@@ -41,10 +45,13 @@
         "BusinessPartner -> BillingDocument traversal path with edges and join fields"
       ],
       "contract": {
-        "requiredFields": ["fromNode", "toNode", "paths"]
+        "requiredFields": [
+          "fromNode",
+          "toNode",
+          "paths"
+        ]
       }
     },
-
     {
       "id": "plan-schema-design-o2c",
       "critical": true,
@@ -55,10 +62,13 @@
         "Property graph schema design for sales orders, deliveries, billing, payments"
       ],
       "contract": {
-        "requiredFields": ["nodes", "relationships", "propertyJoins"]
+        "requiredFields": [
+          "nodes",
+          "relationships",
+          "propertyJoins"
+        ]
       }
     },
-
     {
       "id": "plan-analyze-billing-cancellation-anomaly",
       "critical": true,
@@ -69,10 +79,15 @@
         "Why do cancellations not link cleanly to billing headers?"
       ],
       "contract": {
-        "requiredFields": ["cancellationNodes", "billingHeadersTotal", "cancelledHeadersFlagged", "headersLinkedByEdge", "cancellationWithoutEdgeCount"]
+        "requiredFields": [
+          "cancellationNodes",
+          "billingHeadersTotal",
+          "cancelledHeadersFlagged",
+          "headersLinkedByEdge",
+          "cancellationWithoutEdgeCount"
+        ]
       }
     },
-
     {
       "id": "plan-profitcenter-to-products-trace",
       "critical": true,
@@ -83,10 +98,14 @@
         "Profit center to product trace using product_plants"
       ],
       "contract": {
-        "requiredFields": ["profitCenter", "journalEntryCount", "productPlantRows", "sampleProductIds"]
+        "requiredFields": [
+          "profitCenter",
+          "journalEntryCount",
+          "productPlantRows",
+          "sampleProductIds"
+        ]
       }
     },
-
     {
       "id": "plan-delivery-gm-status-a-vs-c",
       "critical": true,
@@ -97,10 +116,12 @@
         "Count deliveries by overallGoodsMovementStatus A and C"
       ],
       "contract": {
-        "requiredFields": ["status", "headerCount"]
+        "requiredFields": [
+          "status",
+          "headerCount"
+        ]
       }
     },
-
     {
       "id": "plan-payments-collected-this-month",
       "critical": true,
@@ -112,11 +133,21 @@
         "revenue collected from payments (current month)"
       ],
       "contract": {
-        "requiredFields": ["month", "totalCollected", "currency"],
-        "checks": [{ "type": "range", "field": "totalCollected", "min": 0, "max": 1000000000000 }]
+        "requiredFields": [
+          "month",
+          "totalCollected",
+          "currency"
+        ],
+        "checks": [
+          {
+            "type": "range",
+            "field": "totalCollected",
+            "min": 0,
+            "max": 1000000000000
+          }
+        ]
       }
     },
-
     {
       "id": "plan-sales-revenue-last-month",
       "critical": true,
@@ -128,11 +159,21 @@
         "revenue from sales orders last month"
       ],
       "contract": {
-        "requiredFields": ["month", "totalSalesRevenue", "currency"],
-        "checks": [{ "type": "range", "field": "totalSalesRevenue", "min": 0, "max": 1000000000000 }]
+        "requiredFields": [
+          "month",
+          "totalSalesRevenue",
+          "currency"
+        ],
+        "checks": [
+          {
+            "type": "range",
+            "field": "totalSalesRevenue",
+            "min": 0,
+            "max": 1000000000000
+          }
+        ]
       }
     },
-
     {
       "id": "plan-orders-placed-by-customer",
       "critical": true,
@@ -144,11 +185,23 @@
         "which sales orders did the customer place"
       ],
       "contract": {
-        "requiredFields": ["customerName", "customerId", "orderCount", "orderIds", "currency"],
-        "checks": [{ "type": "range", "field": "orderCount", "min": 0, "max": 100000 }]
+        "requiredFields": [
+          "customerName",
+          "customerId",
+          "orderCount",
+          "orderIds",
+          "currency"
+        ],
+        "checks": [
+          {
+            "type": "range",
+            "field": "orderCount",
+            "min": 0,
+            "max": 100000
+          }
+        ]
       }
     },
-
     {
       "id": "plan-products-stored-in-plant",
       "critical": true,
@@ -161,11 +214,13 @@
         "what products does plant WB05 store"
       ],
       "contract": {
-        "requiredFields": ["productId", "productDescription"],
+        "requiredFields": [
+          "productId",
+          "productDescription"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-cancelled-invoices-summary",
       "critical": true,
@@ -177,12 +232,24 @@
         "billing cancellations summary"
       ],
       "contract": {
-        "requiredFields": ["cancelledDocsCount", "totalCancellationAmount", "currency", "sampleCancelledInvoiceDocIds", "sampleCancelledBillingDocs"],
+        "requiredFields": [
+          "cancelledDocsCount",
+          "totalCancellationAmount",
+          "currency",
+          "sampleCancelledInvoiceDocIds",
+          "sampleCancelledBillingDocs"
+        ],
         "answerTemplate": "Found {{cancelledDocsCount}} cancelled invoices. Total cancellation amount: {{currency}} {{totalCancellationAmount}}. Sample cancelled invoice IDs: {{sampleCancelledInvoiceDocIds}}",
-        "checks": [{ "type": "range", "field": "totalCancellationAmount", "min": 0, "max": 1000000000000 }]
+        "checks": [
+          {
+            "type": "range",
+            "field": "totalCancellationAmount",
+            "min": 0,
+            "max": 1000000000000
+          }
+        ]
       }
     },
-
     {
       "id": "plan-so-to-delivery-and-billing-chain",
       "critical": true,
@@ -193,10 +260,14 @@
         "Trace sales order to delivery and billing documents with join keys"
       ],
       "contract": {
-        "requiredFields": ["salesOrder", "deliveryDocuments", "billingDocuments", "hopKeys"]
+        "requiredFields": [
+          "salesOrder",
+          "deliveryDocuments",
+          "billingDocuments",
+          "hopKeys"
+        ]
       }
     },
-
     {
       "id": "plan-billing-items-by-delivery",
       "critical": true,
@@ -207,10 +278,12 @@
         "Which billing document items reference delivery 80738109"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "billingDocumentItem"]
+        "requiredFields": [
+          "billingDocument",
+          "billingDocumentItem"
+        ]
       }
     },
-
     {
       "id": "plan-products-max-plant-coverage",
       "critical": true,
@@ -221,10 +294,13 @@
         "How many products have maximum plant coverage"
       ],
       "contract": {
-        "requiredFields": ["maxPlantCount", "productCount", "sampleProductIds"]
+        "requiredFields": [
+          "maxPlantCount",
+          "productCount",
+          "sampleProductIds"
+        ]
       }
     },
-
     {
       "id": "plan-customer-billed-vs-paid-balance",
       "critical": true,
@@ -235,10 +311,15 @@
         "Outstanding balance for customer 320000083 (billed vs paid)"
       ],
       "contract": {
-        "requiredFields": ["customerId", "totalBilled", "totalPaid", "outstandingBalance", "currency"]
+        "requiredFields": [
+          "customerId",
+          "totalBilled",
+          "totalPaid",
+          "outstandingBalance",
+          "currency"
+        ]
       }
     },
-
     {
       "id": "plan-q4-billing-doc-type-breakdown",
       "critical": true,
@@ -251,11 +332,15 @@
         "Breakdown of billing docs by type with cancelled count"
       ],
       "contract": {
-        "requiredFields": ["billingDocumentType", "totalCount", "cancelledCount", "totalNetAmount"],
+        "requiredFields": [
+          "billingDocumentType",
+          "totalCount",
+          "cancelledCount",
+          "totalNetAmount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-q5-active-billing-docs-totals",
       "critical": true,
@@ -268,13 +353,23 @@
         "active (non-cancelled) billing document totals and percentage of all docs"
       ],
       "contract": {
-        "requiredFields": ["activeDocs", "totalDocs", "activePercentage", "activeTotalNetAmount", "currency"],
+        "requiredFields": [
+          "activeDocs",
+          "totalDocs",
+          "activePercentage",
+          "activeTotalNetAmount",
+          "currency"
+        ],
         "checks": [
-          { "type": "range", "field": "activePercentage", "min": 0, "max": 100 }
+          {
+            "type": "range",
+            "field": "activePercentage",
+            "min": 0,
+            "max": 100
+          }
         ]
       }
     },
-
     {
       "id": "plan-q6-top-month-active-revenue",
       "critical": true,
@@ -287,13 +382,23 @@
         "peak billing revenue month excluding cancellations"
       ],
       "contract": {
-        "requiredFields": ["month", "activeRevenueAmount", "activeRevenuePercentage", "activeRevenueTotal", "currency"],
+        "requiredFields": [
+          "month",
+          "activeRevenueAmount",
+          "activeRevenuePercentage",
+          "activeRevenueTotal",
+          "currency"
+        ],
         "checks": [
-          { "type": "range", "field": "activeRevenuePercentage", "min": 0, "max": 100 }
+          {
+            "type": "range",
+            "field": "activeRevenuePercentage",
+            "min": 0,
+            "max": 100
+          }
         ]
       }
     },
-
     {
       "id": "plan-q7-plant-revenue-ranking",
       "critical": true,
@@ -306,13 +411,23 @@
         "Top plants by billing revenue amount"
       ],
       "contract": {
-        "requiredFields": ["plantId", "plantName", "totalBilledRevenue", "billingDocCount", "deliveryItemCount", "currency"],
+        "requiredFields": [
+          "plantId",
+          "plantName",
+          "totalBilledRevenue",
+          "billingDocCount",
+          "deliveryItemCount",
+          "currency"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "totalBilledRevenue", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "totalBilledRevenue",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-q9-unpaid-active-billing",
       "critical": true,
@@ -325,11 +440,14 @@
         "Active invoices with no payment yet"
       ],
       "contract": {
-        "requiredFields": ["unpaidCount", "totalOutstandingAmount", "currency"],
+        "requiredFields": [
+          "unpaidCount",
+          "totalOutstandingAmount",
+          "currency"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-revenue-concentration",
       "critical": true,
@@ -342,13 +460,20 @@
         "Show me how revenue is distributed across all customers"
       ],
       "contract": {
-        "requiredFields": ["customer", "revenue", "percentage"],
+        "requiredFields": [
+          "customer",
+          "revenue",
+          "percentage"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "revenue", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "revenue",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-payment-clearing-time",
       "critical": false,
@@ -361,11 +486,13 @@
         "Show me invoice to payment clearing timeline"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "daysToClear"],
+        "requiredFields": [
+          "billingDocument",
+          "daysToClear"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-cancelled-after-payment",
       "critical": true,
@@ -378,11 +505,13 @@
         "Payment received but then invoice cancelled — find all"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "totalNetAmount"],
+        "requiredFields": [
+          "billingDocument",
+          "totalNetAmount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-full-anomaly-report",
       "critical": true,
@@ -399,7 +528,6 @@
         "checks": []
       }
     },
-
     {
       "id": "plan-delivery-fulfillment-rate",
       "critical": true,
@@ -412,13 +540,22 @@
         "Fulfillment rate analysis: ordered vs delivered items per customer"
       ],
       "contract": {
-        "requiredFields": ["customer", "totalItems", "deliveredItems", "fulfillmentRate"],
+        "requiredFields": [
+          "customer",
+          "totalItems",
+          "deliveredItems",
+          "fulfillmentRate"
+        ],
         "checks": [
-          { "type": "range", "field": "fulfillmentRate", "min": 0, "max": 100 }
+          {
+            "type": "range",
+            "field": "fulfillmentRate",
+            "min": 0,
+            "max": 100
+          }
         ]
       }
     },
-
     {
       "id": "plan-most-expensive-billing-item",
       "critical": false,
@@ -431,11 +568,13 @@
         "Most costly invoice line items with product details"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "netAmount"],
+        "requiredFields": [
+          "billingDocument",
+          "netAmount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-top-customers-by-orders",
       "critical": false,
@@ -448,13 +587,19 @@
         "Customer ranking by total orders placed"
       ],
       "contract": {
-        "requiredFields": ["customer", "orderCount"],
+        "requiredFields": [
+          "customer",
+          "orderCount"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "orderCount", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "orderCount",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-top-customers-by-amount",
       "critical": false,
@@ -467,13 +612,19 @@
         "Highest spending customers"
       ],
       "contract": {
-        "requiredFields": ["customer", "totalAmount"],
+        "requiredFields": [
+          "customer",
+          "totalAmount"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "totalAmount", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "totalAmount",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-top-products",
       "critical": false,
@@ -486,13 +637,19 @@
         "Top products by invoice count"
       ],
       "contract": {
-        "requiredFields": ["product", "billingCount"],
+        "requiredFields": [
+          "product",
+          "billingCount"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "billingCount", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "billingCount",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-journal-entry-distribution",
       "critical": false,
@@ -505,11 +662,16 @@
         "Show positive vs negative journal entries per customer"
       ],
       "contract": {
-        "requiredFields": ["customer", "totalEntries", "positiveEntries", "negativeEntries", "netAmount"],
+        "requiredFields": [
+          "customer",
+          "totalEntries",
+          "positiveEntries",
+          "negativeEntries",
+          "netAmount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-payment-terms-split",
       "critical": false,
@@ -522,11 +684,14 @@
         "Customer payment term preferences"
       ],
       "contract": {
-        "requiredFields": ["customer", "paymentTerm", "orderCount"],
+        "requiredFields": [
+          "customer",
+          "paymentTerm",
+          "orderCount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-broken-flows-undelivered",
       "critical": true,
@@ -539,11 +704,13 @@
         "Sales orders with missing delivery documents"
       ],
       "contract": {
-        "requiredFields": ["orderId", "undeliveredItems"],
+        "requiredFields": [
+          "orderId",
+          "undeliveredItems"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-broken-flows-unbilled",
       "critical": true,
@@ -556,11 +723,12 @@
         "Orders delivered but revenue not recognized"
       ],
       "contract": {
-        "requiredFields": ["deliveryId"],
+        "requiredFields": [
+          "deliveryId"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-customers-without-billing",
       "critical": false,
@@ -573,11 +741,13 @@
         "Zero-billing customers in the system"
       ],
       "contract": {
-        "requiredFields": ["customerId", "customer"],
+        "requiredFields": [
+          "customerId",
+          "customer"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-products-never-delivered",
       "critical": false,
@@ -590,11 +760,13 @@
         "Products that have been sold but never shipped"
       ],
       "contract": {
-        "requiredFields": ["productId", "product"],
+        "requiredFields": [
+          "productId",
+          "product"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-unpaid-invoices",
       "critical": true,
@@ -607,11 +779,13 @@
         "Billing documents with no payment received"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "amount"],
+        "requiredFields": [
+          "billingDocument",
+          "amount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-cancelled-docs",
       "critical": false,
@@ -624,11 +798,13 @@
         "Billing cancellations with associated deliveries"
       ],
       "contract": {
-        "requiredFields": ["originalDoc", "cancelDoc"],
+        "requiredFields": [
+          "originalDoc",
+          "cancelDoc"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-customer-billing-summary",
       "critical": false,
@@ -641,15 +817,18 @@
         "Customer billing health report"
       ],
       "contract": {
-        "requiredFields": ["totalDocs", "activeDocs", "cancelledDocs"],
+        "requiredFields": [
+          "totalDocs",
+          "activeDocs",
+          "cancelledDocs"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-o2c-health-summary",
       "critical": true,
-      "functionName": null,
+      "functionName": "getO2CHealthSummary",
       "routingExamples": [
         "Give me a full O2C health summary: orders, deliveries, billing, and payments",
         "Overall order to cash pipeline health check",
@@ -658,15 +837,20 @@
         "High-level O2C process dashboard"
       ],
       "contract": {
-        "requiredFields": ["totalOrders", "totalDeliveries", "totalInvoices", "totalBilled", "totalPayments"],
+        "requiredFields": [
+          "totalOrders",
+          "totalDeliveries",
+          "totalInvoices",
+          "totalBilled",
+          "totalPayments"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-ar-aging-buckets",
       "critical": true,
-      "functionName": null,
+      "functionName": "getARAgingBuckets",
       "routingExamples": [
         "Show AR aging buckets for all customers (0-30, 31-60, 61-90, 90+ days)",
         "Accounts receivable aging analysis",
@@ -675,15 +859,20 @@
         "Aging bucket distribution for outstanding receivables"
       ],
       "contract": {
-        "requiredFields": ["customer", "aging_0_30", "aging_31_60", "aging_61_90", "aging_90plus"],
+        "requiredFields": [
+          "customer",
+          "aging_0_30",
+          "aging_31_60",
+          "aging_61_90",
+          "aging_90plus"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-dso-per-customer",
       "critical": false,
-      "functionName": null,
+      "functionName": "getDSOPerCustomer",
       "routingExamples": [
         "What is the average days sales outstanding (DSO) per customer?",
         "DSO analysis by customer",
@@ -692,15 +881,18 @@
         "Days sales outstanding report"
       ],
       "contract": {
-        "requiredFields": ["customer", "avgDSO_days", "paidInvoices"],
+        "requiredFields": [
+          "customer",
+          "avgDSO_days",
+          "paidInvoices"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-credit-exposure",
       "critical": true,
-      "functionName": null,
+      "functionName": "getCreditExposure",
       "routingExamples": [
         "What is the open credit exposure per customer?",
         "Customer credit risk from unpaid invoices",
@@ -709,13 +901,20 @@
         "Open accounts receivable exposure analysis"
       ],
       "contract": {
-        "requiredFields": ["customer", "totalExposure", "unpaidDocs"],
+        "requiredFields": [
+          "customer",
+          "totalExposure",
+          "unpaidDocs"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "totalExposure", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "totalExposure",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-compare-customers",
       "critical": false,
@@ -728,15 +927,18 @@
         "Compare cancellation rates between two customers"
       ],
       "contract": {
-        "requiredFields": ["customer", "revenue", "docCount"],
+        "requiredFields": [
+          "customer",
+          "revenue",
+          "docCount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-cancellation-rate-by-customer",
       "critical": false,
-      "functionName": null,
+      "functionName": "getCancellationRateByCustomer",
       "routingExamples": [
         "What is the cancellation rate by customer?",
         "Which customers have the highest billing cancellation rate?",
@@ -745,17 +947,25 @@
         "Who cancels the most invoices proportionally?"
       ],
       "contract": {
-        "requiredFields": ["customer", "totalDocs", "cancelledDocs", "cancellationRate"],
+        "requiredFields": [
+          "customer",
+          "totalDocs",
+          "cancelledDocs",
+          "cancellationRate"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "cancellationRate", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "cancellationRate",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-currency-analysis",
       "critical": false,
-      "functionName": null,
+      "functionName": "getCurrencyAnalysis",
       "routingExamples": [
         "What currencies are used across billing documents?",
         "Currency distribution in billing",
@@ -764,15 +974,18 @@
         "How many billing docs per currency?"
       ],
       "contract": {
-        "requiredFields": ["currency", "documentCount", "totalAmount"],
+        "requiredFields": [
+          "currency",
+          "documentCount",
+          "totalAmount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-blocked-customers-with-orders",
       "critical": true,
-      "functionName": null,
+      "functionName": "getBlockedCustomersWithOrders",
       "routingExamples": [
         "Are there any blocked customers with active orders?",
         "Blocked business partners who still have open sales orders",
@@ -781,15 +994,17 @@
         "Customers marked as blocked with active order value"
       ],
       "contract": {
-        "requiredFields": ["customer", "orderCount"],
+        "requiredFields": [
+          "customer",
+          "orderCount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-customer-order-recency",
       "critical": false,
-      "functionName": null,
+      "functionName": "getCustomerOrderRecency",
       "routingExamples": [
         "Which customers have not placed orders in the last 6 months?",
         "Inactive customers by last order date",
@@ -798,17 +1013,24 @@
         "Days since last order for each customer"
       ],
       "contract": {
-        "requiredFields": ["customer", "lastOrderDate", "daysSinceLastOrder"],
+        "requiredFields": [
+          "customer",
+          "lastOrderDate",
+          "daysSinceLastOrder"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "daysSinceLastOrder", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "daysSinceLastOrder",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-delivery-lead-time",
       "critical": false,
-      "functionName": null,
+      "functionName": "getDeliveryLeadTime",
       "routingExamples": [
         "What is the average delivery lead time from order to delivery per customer?",
         "How long does it take from order placement to delivery?",
@@ -817,15 +1039,18 @@
         "Delivery speed analysis by customer"
       ],
       "contract": {
-        "requiredFields": ["customer", "avgLeadDays", "deliveries"],
+        "requiredFields": [
+          "customer",
+          "avgLeadDays",
+          "deliveries"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-overdue-deliveries",
       "critical": true,
-      "functionName": null,
+      "functionName": "getOverdueDeliveries",
       "routingExamples": [
         "Which deliveries are overdue — confirmed date passed but not yet delivered?",
         "Overdue delivery schedule lines",
@@ -834,15 +1059,17 @@
         "Orders past due date without fulfillment"
       ],
       "contract": {
-        "requiredFields": ["salesOrder", "daysOverdue"],
+        "requiredFields": [
+          "salesOrder",
+          "daysOverdue"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-high-value-orders",
       "critical": false,
-      "functionName": null,
+      "functionName": "getHighValueOrders",
       "routingExamples": [
         "Show me orders with unusually high value (above 3x average)",
         "Which sales orders have abnormally high amounts?",
@@ -851,17 +1078,24 @@
         "Flag orders that are much larger than typical"
       ],
       "contract": {
-        "requiredFields": ["orderId", "orderValue", "timesAvg"],
+        "requiredFields": [
+          "orderId",
+          "orderValue",
+          "timesAvg"
+        ],
         "checks": [
-          { "type": "monotonic", "field": "orderValue", "direction": "desc" }
+          {
+            "type": "monotonic",
+            "field": "orderValue",
+            "direction": "desc"
+          }
         ]
       }
     },
-
     {
       "id": "plan-debit-credit-totals",
       "critical": false,
-      "functionName": null,
+      "functionName": "getDebitCreditTotals",
       "routingExamples": [
         "What is the total debit vs credit amount across all journal entries?",
         "Debit and credit summary from FI postings",
@@ -870,15 +1104,18 @@
         "Sum of all debits and credits in the system"
       ],
       "contract": {
-        "requiredFields": ["totalDebits", "totalCredits", "netBalance"],
+        "requiredFields": [
+          "totalDebits",
+          "totalCredits",
+          "netBalance"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-fi-posting-gaps",
       "critical": true,
-      "functionName": null,
+      "functionName": "getFIPostingGaps",
       "routingExamples": [
         "Which billing documents have no journal entries?",
         "Find invoices without FI postings",
@@ -887,15 +1124,17 @@
         "Invoices not posted to accounting"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "totalNetAmount"],
+        "requiredFields": [
+          "billingDocument",
+          "totalNetAmount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-single-customer-products",
       "critical": false,
-      "functionName": null,
+      "functionName": "getSingleCustomerProducts",
       "routingExamples": [
         "Which products are ordered by only one customer?",
         "Single-customer products analysis",
@@ -904,15 +1143,18 @@
         "Customer dependency risk: products sold to only one client"
       ],
       "contract": {
-        "requiredFields": ["productId", "product", "soloCustomerId"],
+        "requiredFields": [
+          "productId",
+          "product",
+          "soloCustomerId"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-cross-domain-summary",
       "critical": false,
-      "functionName": null,
+      "functionName": "getCrossDomainSummary",
       "routingExamples": [
         "For each customer show order count, delivery count, and billing total",
         "Customer-level O2C summary with orders, deliveries, billing",
@@ -921,15 +1163,19 @@
         "Customer scorecard: orders placed, items delivered, total billed"
       ],
       "contract": {
-        "requiredFields": ["customer", "orders", "deliveries", "billingTotal"],
+        "requiredFields": [
+          "customer",
+          "orders",
+          "deliveries",
+          "billingTotal"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-order-value-distribution",
       "critical": false,
-      "functionName": null,
+      "functionName": "getOrderValueDistribution",
       "routingExamples": [
         "What is the distribution of sales order values (min, max, avg)?",
         "Sales order value distribution statistics",
@@ -938,15 +1184,19 @@
         "Order value range and central tendency"
       ],
       "contract": {
-        "requiredFields": ["orderCount", "minValue", "maxValue", "avgValue"],
+        "requiredFields": [
+          "orderCount",
+          "minValue",
+          "maxValue",
+          "avgValue"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-delivery-status-breakdown",
       "critical": false,
-      "functionName": null,
+      "functionName": "getDeliveryStatusBreakdown",
       "routingExamples": [
         "What is the overall delivery status breakdown?",
         "How many orders are in each delivery status?",
@@ -955,15 +1205,17 @@
         "Count of orders by delivery completion status"
       ],
       "contract": {
-        "requiredFields": ["status", "orderCount"],
+        "requiredFields": [
+          "status",
+          "orderCount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-incoterms-analysis",
       "critical": false,
-      "functionName": null,
+      "functionName": "getIncotermsAnalysis",
       "routingExamples": [
         "What incoterms are used across sales orders?",
         "Incoterms distribution in the system",
@@ -972,11 +1224,13 @@
         "Trade terms usage analysis"
       ],
       "contract": {
-        "requiredFields": ["incoterms", "orderCount"],
+        "requiredFields": [
+          "incoterms",
+          "orderCount"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-deliveries-not-billed",
       "critical": true,
@@ -991,11 +1245,12 @@
         "Find goods that went out but were never billed"
       ],
       "contract": {
-        "requiredFields": ["deliveryDocument"],
+        "requiredFields": [
+          "deliveryDocument"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-order-to-payment-cycle",
       "critical": true,
@@ -1010,11 +1265,13 @@
         "Which customers take the longest to pay after placing an order?"
       ],
       "contract": {
-        "requiredFields": ["customer", "avgCycleDays"],
+        "requiredFields": [
+          "customer",
+          "avgCycleDays"
+        ],
         "checks": []
       }
     },
-
     {
       "id": "plan-payments-without-journal",
       "critical": true,
@@ -1028,10 +1285,12 @@
         "Find unposted payments in the ledger"
       ],
       "contract": {
-        "requiredFields": ["billingDocument", "paymentAmount"],
+        "requiredFields": [
+          "billingDocument",
+          "paymentAmount"
+        ],
         "checks": []
       }
     }
-
   ]
 }

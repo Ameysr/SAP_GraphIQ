@@ -43,6 +43,21 @@ export const FUNCTION_REGISTRY: Record<IntentType, FunctionDef[]> = {
     { name: 'getPaymentTermsSplit', description: 'Get payment terms (Z001/Z009) split across all sales orders grouped by customer', params: {} },
     { name: 'getBillingDocTypeBreakdown', description: 'Get breakdown of billing documents by type (F2, S1 etc): count, cancelled count, total net amount per type', params: {} },
     { name: 'getPlantRevenueRanking', description: 'Rank all plants by total billed revenue from active (non-cancelled) billing items linked through deliveries', params: {} },
+    // Analytics (pre-built complex queries)
+    { name: 'getO2CHealthSummary', description: 'Full O2C health summary: total orders, deliveries, invoices, billed amount, payments, collected amount', params: {} },
+    { name: 'getARAgingBuckets', description: 'AR aging buckets per customer: 0-30, 31-60, 61-90, 90+ days outstanding amounts', params: {} },
+    { name: 'getDSOPerCustomer', description: 'Average Days Sales Outstanding (DSO) per customer based on billing-to-payment clearing time', params: {} },
+    { name: 'getCreditExposure', description: 'Open credit exposure per customer: total unpaid invoice amounts', params: {} },
+    { name: 'getCancellationRateByCustomer', description: 'Cancellation rate per customer: cancelled vs total billing documents as percentage', params: {} },
+    { name: 'getCurrencyAnalysis', description: 'Currency distribution across billing documents: count and total amount per currency', params: {} },
+    { name: 'getCrossDomainSummary', description: 'Cross-domain customer summary: order count, delivery count, and billing total per customer', params: {} },
+    { name: 'getOrderValueDistribution', description: 'Statistical distribution of sales order values: min, max, avg, total', params: {} },
+    { name: 'getDeliveryStatusBreakdown', description: 'Breakdown of sales orders by overall delivery status (counts per status)', params: {} },
+    { name: 'getIncotermsAnalysis', description: 'Distribution of incoterms classifications across sales orders', params: {} },
+    { name: 'getDeliveryLeadTime', description: 'Average delivery lead time from order creation to delivery per customer', params: {} },
+    { name: 'getHighValueOrders', description: 'Sales orders with unusually high value (above 3x average) — outlier detection', params: {} },
+    { name: 'getDebitCreditTotals', description: 'Total debit vs credit amounts across all journal entries with net balance', params: {} },
+    { name: 'getSingleCustomerProducts', description: 'Products ordered by only one customer — dependency risk analysis', params: {} },
   ],
   DETECT: [
     { name: 'findBrokenFlows', description: 'Find orders/deliveries with incomplete O2C chains: undelivered orders, unbilled deliveries, or unpaid invoices', params: { type: 'undelivered|unbilled|unpaid' } },
@@ -60,6 +75,11 @@ export const FUNCTION_REGISTRY: Record<IntentType, FunctionDef[]> = {
     { name: 'getMostExpensiveBillingItem', description: 'Find the most expensive billing items by net amount, including product info, cancellation status, and customer', params: {} },
     { name: 'getUnpaidActiveBillingDocs', description: 'Get active (non-cancelled) billing documents that have NOT been paid, with count, total outstanding amount, and customer breakdown', params: {} },
     { name: 'analyzeBillingCancellationAnomaly', description: 'Analyze anomaly between billing_document_headers and billing_document_cancellations: counts and missing CANCELS edges', params: {} },
+    // Analytics risk/anomaly functions
+    { name: 'getBlockedCustomersWithOrders', description: 'Find blocked customers who still have active sales orders — compliance risk', params: {} },
+    { name: 'getOverdueDeliveries', description: 'Find deliveries overdue: confirmed delivery date passed but not yet fulfilled', params: {} },
+    { name: 'getCustomerOrderRecency', description: 'Find customers who have not ordered in the last 6 months — churn risk', params: {} },
+    { name: 'getFIPostingGaps', description: 'Find billing documents that have no journal entries posted — FI reconciliation gap', params: {} },
   ],
   COMPARE: [
     { name: 'compareCustomerRevenue', description: 'Compare two customers head-to-head: total revenue, billing docs, cancellation rate, unpaid amount', params: { customerId1: 'string', customerId2: 'string' } },

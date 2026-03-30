@@ -219,7 +219,46 @@ export async function runPipeline(
   let bestResults: Record<string, unknown>[] | null = null;
   let bestResultsPath: string | null = null;
 
+  // ── PRE-EMPTIVE DECOMPOSITION FOR COMPLEX QUESTIONS ──
+  // If the question is multi-part and NO plan was matched, try decomposition
+  // BEFORE wasting retries on single-query generation.
+  if (
+    state.pathTaken !== 'function' &&
+    state.pathTaken !== 'schema' &&
+    (state.complexity === 'COMPLEX' || state.tierToUse === 3)
+  ) {
+    const { needsDecomposition, decomposeAndExecute } = await import('./nodes/queryDecomposer.js');
+    if (needsDecomposition(state.resolvedMessage)) {
+      console.log(`  [5] Complex query detected — trying decomposition first`);
+      try {
+        const decomposition = await decomposeAndExecute(
+          state.resolvedMessage,
+          state.extractedEntities as Record<string, string>
+        );
+        if (decomposition.wasDecomposed && decomposition.mergedResults.length > 0) {
+          console.log(`  [5] Decomposition successful: ${decomposition.mergedResults.length} results from ${decomposition.subQueries.length} sub-queries`);
+          state = {
+            ...state,
+            queryResults: decomposition.mergedResults,
+            confidence: 'medium',
+            queryError: null,
+            executedCypher: decomposition.subQueries.map(sq => sq.cypher).join('\n---\n'),
+            pathTaken: 'template',
+          };
+          // Skip the retry loop — go straight to answer formatting
+        }
+      } catch (err) {
+        console.log(`  [5] Decomposition failed, falling back to standard execution: ${(err as Error).message?.substring(0, 80)}`);
+      }
+    }
+  }
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // Skip retry loop if decomposition already produced results
+    if (state.queryResults && state.queryResults.length > 0 && attempt === 0) {
+      break;
+    }
+
     // ── SMART RETRY: inject previous failure context ──
     if (attempt > 0 && lastFailedCypher) {
       state = {

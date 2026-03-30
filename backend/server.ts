@@ -9,6 +9,8 @@ import { getMetrics } from './services/metrics.js';
 import { getRedis, closeRedis } from './redis.js';
 import { closeDriver, runQuery } from './db.js';
 import { getLLMStats } from './services/llm.js';
+import { initEmbeddings } from './services/embedding.js';
+import { initQuestionPlans } from './services/questionPlans.js';
 
 // Load .env from project root in dev; in production (Render) env vars are injected natively
 if (process.env.NODE_ENV !== 'production') {
@@ -27,6 +29,7 @@ app.use(cors({
     const allowed = [
       FRONTEND_URL,
       'http://localhost:5173',
+      'http://localhost:5174',
       'http://localhost:3000',
     ];
     // Allow all Vercel preview/production deployments
@@ -242,6 +245,10 @@ server = app.listen(PORT, async () => {
   console.log(`   Metrics:     http://localhost:${PORT}/api/metrics`);
   console.log(`   Suggestions: http://localhost:${PORT}/api/suggestions`);
   await validateSchema();
+  // Initialize semantic embeddings model (downloads ~23MB on first run)
+  await initEmbeddings();
+  // Re-embed question plans with semantic model
+  await initQuestionPlans();
   console.log('');
 });
 

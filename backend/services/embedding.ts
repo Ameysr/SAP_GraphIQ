@@ -1,6 +1,6 @@
 // ── EMBEDDING SERVICE ─────────────────────────────────────────────────────────
-// Uses Groq LLM to generate semantic fingerprints for caching
-// Approach: Extract key concepts → generate stable hash → compare
+// Dual-mode: Uses Xenova/transformers (all-MiniLM-L6-v2) for real semantic
+// embeddings with automatic fallback to enhanced TF-IDF if model load fails.
 
 import Groq from 'groq-sdk';
 import dotenv from 'dotenv';
@@ -14,7 +14,60 @@ function getGroq(): Groq {
   return groqClient;
 }
 
-// ── LIGHTWEIGHT EMBEDDING: TF-IDF-like keyword vectors ────────────────────────
+// ── REAL SEMANTIC EMBEDDINGS (all-MiniLM-L6-v2 via ONNX) ──────────────────────
+// 384-dimensional vectors with actual semantic understanding.
+// Model is ~23MB, auto-downloaded on first use, cached locally.
+
+let transformerPipeline: any = null;
+let transformerLoadFailed = false;
+let transformerLoading: Promise<void> | null = null;
+
+async function loadTransformerModel(): Promise<void> {
+  if (transformerPipeline || transformerLoadFailed) return;
+  if (transformerLoading) {
+    await transformerLoading;
+    return;
+  }
+
+  transformerLoading = (async () => {
+    try {
+      console.log('  [Embedding] Loading all-MiniLM-L6-v2 model...');
+      // Dynamic import since @xenova/transformers is ESM-first
+      const { pipeline } = await import('@xenova/transformers');
+      transformerPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+        quantized: true, // Use quantized model for faster load + smaller footprint
+      });
+      console.log('  [Embedding] ✓ Model loaded — semantic embeddings active');
+    } catch (err) {
+      console.error('  [Embedding] ✗ Model load failed, falling back to enhanced TF-IDF:', (err as Error).message?.substring(0, 80));
+      transformerLoadFailed = true;
+    }
+  })();
+  await transformerLoading;
+}
+
+/**
+ * Generate a real 384-dim semantic embedding using sentence-transformers.
+ * Returns null if the model hasn't loaded yet (first call triggers async load).
+ */
+async function getTransformerEmbedding(text: string): Promise<number[] | null> {
+  if (transformerLoadFailed) return null;
+  if (!transformerPipeline) {
+    // Trigger load but don't block — return null this time, next call will have it
+    loadTransformerModel().catch(() => {});
+    return null;
+  }
+
+  try {
+    const output = await transformerPipeline(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data as Float32Array);
+  } catch (err) {
+    console.error('  [Embedding] Transformer inference failed:', (err as Error).message?.substring(0, 60));
+    return null;
+  }
+}
+
+// ── ENHANCED TF-IDF EMBEDDING (fallback) ──────────────────────────────────────
 // SAP O2C domain vocabulary — each word maps to a dimension
 const VOCAB: string[] = [
   'customer', 'order', 'sales', 'delivery', 'billing', 'invoice', 'payment',
@@ -102,8 +155,59 @@ export function getLocalEmbedding(text: string): number[] {
   return vec.map((v: number) => v / mag);
 }
 
-// ── GROQ-POWERED SEMANTIC FINGERPRINT (fallback for complex queries) ──────────
-// Default: keep free-tier friendly (local embeddings only) unless explicitly enabled.
+// ── SEMANTIC EMBEDDING: Try transformer first, fall back to TF-IDF ────────────
+// This is the PRIMARY embedding function used by questionPlans and GraphRAG.
+// It produces 384-dim vectors when the model is loaded, or falls back to VOCAB-dim.
+
+let semanticEmbeddingCache = new Map<string, number[]>();
+const SEMANTIC_CACHE_MAX = 500;
+
+export async function getSemanticEmbedding(text: string): Promise<number[]> {
+  const key = text.trim().toLowerCase();
+  const cached = semanticEmbeddingCache.get(key);
+  if (cached) return cached;
+
+  // Try real transformer embedding first
+  const transformerEmb = await getTransformerEmbedding(text);
+  if (transformerEmb) {
+    semanticEmbeddingCache.set(key, transformerEmb);
+    if (semanticEmbeddingCache.size > SEMANTIC_CACHE_MAX) {
+      const oldestKey = semanticEmbeddingCache.keys().next().value as string | undefined;
+      if (oldestKey) semanticEmbeddingCache.delete(oldestKey);
+    }
+    return transformerEmb;
+  }
+
+  // Fallback to local TF-IDF
+  const localEmb = getLocalEmbedding(text);
+  semanticEmbeddingCache.set(key, localEmb);
+  return localEmb;
+}
+
+/**
+ * Synchronous embedding — always uses local TF-IDF.
+ * Used in hot paths where async isn't feasible (initial library embedding).
+ */
+export function getLocalEmbeddingSync(text: string): number[] {
+  return getLocalEmbedding(text);
+}
+
+/**
+ * Initialize the transformer model eagerly.
+ * Call this at server startup so the model is ready before first query.
+ */
+export async function initEmbeddings(): Promise<void> {
+  await loadTransformerModel();
+}
+
+/**
+ * Check if semantic (transformer) embeddings are available.
+ */
+export function isSemanticReady(): boolean {
+  return !!transformerPipeline && !transformerLoadFailed;
+}
+
+// ── GROQ-POWERED SEMANTIC FINGERPRINT (legacy, kept as option) ───────────────
 let groqEmbeddingEnabled = (process.env.GROQ_EMBEDDING_ENABLED ?? 'false').toLowerCase() === 'true';
 let groqFailCount = 0;
 
@@ -133,8 +237,7 @@ async function getGroqFingerprint(text: string): Promise<number[] | null> {
     for (const concept of concepts) {
       const mapped = SYNONYMS[concept] || concept;
       const idx = VOCAB.indexOf(mapped);
-      if (idx >= 0) vec[idx] = 2.0; // Strong weight for LLM-extracted concepts
-      // Partial match
+      if (idx >= 0) vec[idx] = 2.0;
       for (let i = 0; i < VOCAB.length; i++) {
         if (mapped.startsWith(VOCAB[i]) || VOCAB[i].startsWith(mapped)) {
           vec[i] = Math.max(vec[i], 1.0);
@@ -159,7 +262,13 @@ async function getGroqFingerprint(text: string): Promise<number[] | null> {
 
 // ── PUBLIC API ────────────────────────────────────────────────────────────────
 export async function getEmbedding(text: string): Promise<number[] | null> {
-  // Try Groq fingerprint first (more semantic)
+  // Try transformer first (most accurate)
+  const transformerEmb = await getTransformerEmbedding(text);
+  if (transformerEmb) {
+    return transformerEmb;
+  }
+
+  // Try Groq fingerprint (if enabled)
   const groqEmb = await getGroqFingerprint(text);
   if (groqEmb) {
     console.log('  [Embedding] Groq fingerprint generated');
@@ -170,7 +279,6 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
   const localEmb = getLocalEmbedding(text);
   const hasSignal = localEmb.some(v => v > 0);
   if (hasSignal) {
-    console.log('  [Embedding] Local embedding generated');
     return localEmb;
   }
 
