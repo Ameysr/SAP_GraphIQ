@@ -2,7 +2,7 @@
 // Production-grade: Embeds curated query library at startup, retrieves top-K
 // similar examples at query time, and builds a mini-schema for the LLM.
 
-import { getLocalEmbedding, getSemanticEmbedding, isSemanticReady } from './embedding.js';
+import { getLocalEmbedding } from './embedding.js';
 import { QUERY_LIBRARY, type QueryExample } from './queryLibrary.js';
 
 // ── SCHEMA FRAGMENTS ──────────────────────────────────────────────────────────
@@ -79,19 +79,7 @@ function embedLibrary(): void {
   console.log(`  [GraphRAG] Library embedded (TF-IDF) \u2713`);
 }
 
-// Re-embed with semantic model once loaded
-let semanticLibraryDone = false;
-async function reembedLibraryWithSemantic(): Promise<void> {
-  if (semanticLibraryDone || !isSemanticReady()) return;
-  console.log(`  [GraphRAG] Re-embedding library with semantic model...`);
-  for (const example of QUERY_LIBRARY) {
-    example.embedding = await getSemanticEmbedding(example.question);
-  }
-  semanticLibraryDone = true;
-  // Clear the context cache since embeddings changed
-  contextCache.clear();
-  console.log(`  [GraphRAG] Library re-embedded (semantic) \u2713`);
-}
+
 
 function cosineSim(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
@@ -119,10 +107,6 @@ export interface GraphRAGContext {
  */
 export async function retrieveContext(question: string, topK: number = 5): Promise<GraphRAGContext> {
   embedLibrary();
-  // If semantic model just became ready, upgrade the library
-  if (isSemanticReady() && !semanticLibraryDone) {
-    await reembedLibraryWithSemantic();
-  }
 
   const cacheKey = `${question.trim().toLowerCase()}|topK=${topK}`;
   const cached = contextCache.get(cacheKey);
@@ -130,10 +114,7 @@ export async function retrieveContext(question: string, topK: number = 5): Promi
     return cached.value;
   }
 
-  // Use semantic embedding if available, else local TF-IDF
-  const queryEmb = isSemanticReady()
-    ? await getSemanticEmbedding(question)
-    : getLocalEmbedding(question);
+  const queryEmb = getLocalEmbedding(question);
   
   // Score all examples
   const scored = QUERY_LIBRARY

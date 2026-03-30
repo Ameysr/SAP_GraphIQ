@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getLocalEmbedding, getSemanticEmbedding, isSemanticReady } from './embedding.js';
+import { getLocalEmbedding } from './embedding.js';
 
 export type ContractCheck =
   | { type: 'range'; field: string; min: number; max: number }
@@ -106,34 +106,13 @@ async function loadPlansConfig(): Promise<LoadedPlansConfig> {
   return cachedConfig;
 }
 
-// ── ASYNC RE-EMBED with semantic model once loaded ────────────────────────────
-let semanticReembedDone = false;
-
-async function reembedWithSemantic(): Promise<void> {
-  if (semanticReembedDone || !isSemanticReady() || !cachedConfig) return;
-  console.log('  [QuestionPlans] Re-embedding routing examples with semantic model...');
-  const startMs = Date.now();
-
-  const newEmbeddings = await Promise.all(
-    cachedConfig.plans.map(async (plan) => ({
-      plan,
-      exampleEmbeddings: await Promise.all(
-        (plan.routingExamples ?? []).map((ex) => getSemanticEmbedding(ex))
-      ),
-    }))
-  );
-  cachedExampleEmbeddings = newEmbeddings;
-  semanticReembedDone = true;
-  console.log(`  [QuestionPlans] ✓ Semantic re-embedding done in ${Date.now() - startMs}ms`);
-}
-
 /**
- * Initialize question plans with semantic embeddings.
- * Call at server startup after initEmbeddings().
+ * Initialize question plans.
+ * Call at server startup.
  */
 export async function initQuestionPlans(): Promise<void> {
   await loadPlansConfig();
-  await reembedWithSemantic();
+  console.log(`  [QuestionPlans] ✓ ${cachedConfig?.plans.length ?? 0} plans loaded with TF-IDF embeddings`);
 }
 
 export async function getPlanCandidates(
@@ -141,16 +120,9 @@ export async function getPlanCandidates(
   topKOverride?: number
 ): Promise<{ candidates: PlanCandidate[]; minSimilarity: number; topK: number }> {
   const config = await loadPlansConfig();
-  // Trigger semantic re-embedding if model is now ready but we haven't re-embedded yet
-  if (isSemanticReady() && !semanticReembedDone) {
-    await reembedWithSemantic();
-  }
   const topK = topKOverride ?? config.topK ?? 3;
 
-  // Use semantic embedding if model is ready, else fallback to TF-IDF
-  const qEmb = isSemanticReady()
-    ? await getSemanticEmbedding(question)
-    : getLocalEmbedding(question);
+  const qEmb = getLocalEmbedding(question);
 
   const candidates: PlanCandidate[] = cachedExampleEmbeddings
     .map(({ plan, exampleEmbeddings }) => {
