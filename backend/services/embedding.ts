@@ -31,6 +31,30 @@ async function loadTransformerModel(): Promise<void> {
 
   transformerLoading = (async () => {
     try {
+      // ── PRE-CHECK: Can onnxruntime-node load on this platform? ──
+      // On Alpine Linux (musl libc), onnxruntime-node requires glibc's dynamic
+      // linker (ld-linux-x86-64.so.2) which doesn't exist. The native .node
+      // binary loading crashes the process with ERR_DLOPEN_FAILED BEFORE any
+      // try-catch can intercept it.
+      // Solution: check if we're on a glibc-incompatible system first.
+      if (process.platform === 'linux') {
+        const fs = await import('fs');
+        const glibcLoader = '/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2';
+        const glibcLoader2 = '/lib64/ld-linux-x86-64.so.2';
+        const hasGlibc = fs.existsSync(glibcLoader) || fs.existsSync(glibcLoader2);
+        if (!hasGlibc) {
+          // Check if we're on Alpine (musl-based)
+          const isMusl = fs.existsSync('/etc/alpine-release') ||
+            (fs.existsSync('/lib/ld-musl-x86_64.so.1'));
+          if (isMusl || !hasGlibc) {
+            console.log('  [Embedding] Platform lacks glibc (Alpine/musl detected) — onnxruntime-node incompatible');
+            console.log('  [Embedding] Falling back to enhanced TF-IDF embeddings');
+            transformerLoadFailed = true;
+            return;
+          }
+        }
+      }
+
       console.log('  [Embedding] Loading all-MiniLM-L6-v2 model...');
       // Dynamic import since @xenova/transformers is ESM-first
       const { pipeline } = await import('@xenova/transformers');
