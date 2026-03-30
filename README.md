@@ -4,12 +4,14 @@ An enterprise grade, AI powered analytical engine that models the SAP Order to C
 
 This is not a simple chatbot wrapper. Every design decision was made to solve real production problems: LLM hallucination, cost control, query safety, response verification, and system resilience.
 
+> **Note:** This project was an assignment with a deadline of March 26th. I continued optimizing it because I treated it as a real production accuracy problem and found it genuinely interesting to solve. The work after the 26th (semantic embeddings, query decomposition, escalating retries, deterministic answer templates) was driven purely by curiosity feel free to consider only the March 26th snapshot if needed.
+
 ---
 
 ## What Makes This Production-Grade
 
 ### 1. Deterministic Query Routing
-54 pre built, typed Cypher functions handle known query patterns. The LLM only selects which function to call and fills parameters no raw Cypher generation, no hallucinated data, no injection attacks. A semantic similarity router hard locks the query to a hardcoded function before the LLM even sees it.
+72 pre built, typed Cypher functions handle known query patterns (54 original + 18 analytics). The LLM only selects which function to call and fills parameters — no raw Cypher generation, no hallucinated data, no injection attacks. A semantic similarity router powered by **all-MiniLM-L6-v2 sentence transformer** (384-dim embeddings) hard locks the query to a hardcoded function before the LLM even sees it.
 
 ### 2. Smart Fallback System
 When dynamic Cypher generation fails after all retries, the system does not return "no data found." Instead, it scans plan candidates for the nearest plan with a real pre built function, executes it, and prefixes the answer with transparency: *"I couldn't answer your exact question directly, but here's the closest available analysis."* This is the industry standard approach used by SAP Analytics Cloud match to the nearest available report rather than silently fail.
@@ -29,10 +31,29 @@ Pre built function results are verified against a data contract: required fields
 ### 6. Schema and Meta-System Intelligence
 Conceptual questions about the graph schema ("What edge connects SalesOrder to DeliveryItem?") and meta system questions ("How does your NL system translate a query?") are detected before plan routing and routed to dedicated functions. This prevents false positive plan matches where schema keywords like "SalesOrder" or "relationship" would incorrectly trigger data retrieval plans.
 
-### 7. Multi-Layer Memory
+### 7. Deterministic Answer Templates
+For 17+ known functions, answers are produced with **zero LLM involvement** — eliminating number hallucination entirely. The system uses pre-built markdown templates that directly format query results (e.g., AR aging buckets, DSO days, credit exposure) with correct currency symbols, percentages, and counts. LLM formatting is only used as a fallback for novel queries.
+
+### 8. Query Decomposition
+Complex multi-part questions ("Show revenue AND delivery rates AND aging buckets for all customers") are automatically detected and split into 2-4 independent sub-queries. Each sub-query gets its own GraphRAG context, Cypher generation, and execution. Results are tagged and merged before answer formatting. Detection uses heuristics: 3+ conjunctions, multiple question marks, 4+ metric keywords.
+
+### 9. Escalating Retry Strategy
+When Cypher generation fails, each retry uses a **fundamentally different approach** instead of repeating the same context:
+
+| Retry | Strategy | LLM Tier | Change |
+|-------|----------|----------|--------|
+| 0 | Standard generation | Tier 2 | 5 GraphRAG examples |
+| 1 | Forced CoT + error analysis | Tier 2 | 7 examples, must write fundamentally different query |
+| 2 | Simplified approach | **Tier 3** (deepseek-reasoner) | Aggressive simplification, 1-2 MATCH clauses only |
+| 3 | Query decomposition | Tier 2 | Breaks question into 2-4 sub-queries |
+
+### 10. Schema-Aware Cypher Validation
+Before executing LLM-generated Cypher, the system validates it against the known graph schema: checks node labels against 16 valid types, relationship types against 16 valid edges, and detects missing `toFloat()` on amount fields. Invalid queries are caught before hitting Neo4j, saving round-trips and improving retry quality.
+
+### 11. Multi-Layer Memory
 Redis backed conversation history (last 10 messages) + entity memory resolve pronouns across turns: *"Show me the order"* resolves to the exact ID discussed moments ago. Semantic cache (cosine similarity > 0.85) skips the full pipeline for repeated or similar questions.
 
-### 8. Multi Layer Security
+### 12. Multi Layer Security
 Input sanitization strips Cypher injection attempts (`CREATE`, `DELETE`, `DROP`, `MERGE`). Rate limiting caps requests at 20/minute per IP. The guardrail node rejects off topic queries before any database access. Entity extraction uses regex, not LLM, to prevent prompt injection through entity names.
 
 ### 9. Resilient Data Ingestion
@@ -63,7 +84,7 @@ Dodge_Ai_Task/
 │   │   └── resume-ingest.ts  # Resilient ingestion for large datasets
 │   ├── services/
 │   │   ├── llm.ts            # 3-tier LLM client (Groq/DeepSeek/Gemini)
-│   │   ├── embedding.ts      # Local TF-IDF embeddings
+│   │   ├── embedding.ts      # Semantic embeddings (all-MiniLM-L6-v2 + TF-IDF fallback)
 │   │   ├── graphRAG.ts       # Few-shot retrieval + schema selection
 │   │   ├── questionPlans.ts  # Semantic plan matcher
 │   │   ├── contractVerifier.ts # Output validation
@@ -73,23 +94,25 @@ Dodge_Ai_Task/
 │   │   ├── metrics.ts        # Latency, cost, usage metrics
 │   │   └── logger.ts         # Observability logging
 │   ├── functions/
-│   │   ├── index.ts          # 54 Cypher functions across 6 intents
+│   │   ├── index.ts          # 72 Cypher functions across 6 intents
 │   │   ├── lookup.ts         # Entity lookups (Customer, Order, Product, etc.)
 │   │   ├── traverse.ts       # Document tracing across O2C chain
 │   │   ├── aggregate.ts      # Revenue, ranking, distribution analytics
 │   │   ├── detect.ts         # Anomaly detection (broken flows, unpaid invoices)
 │   │   ├── compare.ts        # Head-to-head customer comparisons
-│   │   └── meta.ts           # Schema introspection, pipeline description
+│   │   ├── meta.ts           # Schema introspection, pipeline description
+│   │   └── analytics.ts     # 18 pre-built analytics (DSO, aging, credit, etc.)
 │   ├── graph/
 │   │   ├── state.ts          # LangGraph pipeline state interface
-│   │   ├── index.ts          # Pipeline orchestrator with smart retry
+│   │   ├── index.ts          # Pipeline orchestrator with smart retry + decomposition
 │   │   └── nodes/
 │   │       ├── contextResolution.ts  # Pronoun resolution via memory
 │   │       ├── guardrail.ts          # Guardrail + intent + complexity
 │   │       ├── entityExtractor.ts    # Regex-based entity extraction
 │   │       ├── functionSelector.ts   # Plan router + LLM selection
-│   │       ├── hybridExecutor.ts     # Function call OR dynamic Cypher
-│   │       └── answerFormatter.ts    # LLM formatting + error messages
+│   │       ├── hybridExecutor.ts     # Function call OR dynamic Cypher + escalating retries
+│   │       ├── answerFormatter.ts    # Deterministic templates + LLM fallback
+│   │       └── queryDecomposer.ts    # Complex query decomposition engine
 │   ├── routes/
 │   │   ├── chat.ts           # Chat API endpoint
 │   │   ├── graph.ts          # Graph visualization data
@@ -151,8 +174,8 @@ Dodge_Ai_Task/
     2. Guardrail + Intent + Complexity (keyword-first, 0 or 1 LLM)
     3. Entity Extraction (regex, 0 LLM)
     4. Plan Router + Function Selector (plan + entity + LLM fallback)
-    5. Hybrid Executor (function OR dynamic Cypher, 3 retries)
-    6. Answer Formatter (Tier 2 LLM + function schema hints)
+    5. Hybrid Executor (function OR dynamic Cypher, escalating retries + decomposition)
+    6. Answer Formatter (deterministic templates OR Tier 2 LLM fallback)
                |
     +----------+-----------+----------+
     |          |           |          |
@@ -175,19 +198,18 @@ Each query passes through 6 sequential nodes. This is an industry aligned pipeli
 | Guardrail + Intent + Complexity | Single merged node: keyword rules first (0 LLM), then one LLM call returns relevance, intent, complexity, and tier. Detects schema/conceptual questions and routes them to dedicated functions before plan matching. | One call replaces three old nodes. 80% of queries resolved by keywords at 0ms. Schema questions bypass plan routing entirely to avoid false positives. |
 | Entity Extraction | Regex extracts IDs, names, dates from the question. Entities are automatically injected into function params via entity-to-param mapping. | Avoids LLM call for structured extraction. Regex is faster, cheaper, deterministic. Entity injection ensures functions like getOrdersPlacedByCustomer(customerId) receive the extracted ID. |
 | Plan Router + Function Selector | Plan similarity (54 plans, hard lock for critical + soft recommendation at 0.72 threshold), then entity-specific shortcuts, then LLM fallback | Three-tier routing ensures the right function is selected. Threshold raised from 0.55 to 0.72 to eliminate false-positive plan matches. |
-| Hybrid Executor | Runs hardcoded function OR generates Cypher dynamically with GraphRAG context. Includes field-type hints for date handling and amount fields. | If function exists: guaranteed correct. If not: LLM generates Cypher with few-shot examples, targeted schema, and explicit type conversion rules. |
-| Answer Formatter | LLM formats raw query results with function-name schema hints and context-aware error messages | Contract verification, result validation, markdown stripping. Empty results get specific feedback (date range, entity ID, or general guidance). |
+| Hybrid Executor | Runs hardcoded function OR generates Cypher dynamically with GraphRAG context. Escalating retries: Tier 2 → Tier 2+CoT → Tier 3 → Query decomposition. Schema-aware validation catches wrong labels/relationships before execution. | If function exists: guaranteed correct. If not: LLM generates Cypher with few-shot examples, targeted schema, and explicit type conversion rules. Each retry escalates strategy instead of repeating. |
+| Answer Formatter | Deterministic templates for 17+ known functions (zero LLM, zero hallucination). LLM formatting only for novel queries with result sanitization and post-LLM validation. | Template path: exact numbers, correct currency/count formatting. LLM path: contract verification, field-type guards, result deduplication. |
 
-### Smart Retry Loop
+### Escalating Retry Loop
 
-If the executor fails (bad Cypher, empty results), it does not just error out:
+If the executor fails (bad Cypher, empty results), it does not just error out or repeat the same approach:
 
-1. Extracts the Neo4j error message
-2. Sends the failed Cypher + error back to the LLM with a self-correction protocol (diagnose failure before re attempting)
-3. LLM corrects the query using the error feedback
-4. Retries up to 3 times with progressively better context
-5. Best results from any attempt are saved -- if later attempts fail, earlier successful results are restored
-6. If all retries fail, the smart fallback system finds the nearest working pre-built function and executes it with transparency
+1. **Retry 1:** Forces mandatory chain-of-thought reasoning + explicit root cause diagnosis. Retrieves 7 GraphRAG examples (up from 5). Demands a fundamentally different query approach.
+2. **Retry 2:** Escalates to Tier 3 (deepseek-reasoner) — the most powerful model. Forces aggressive simplification: 1-2 MATCH clauses, OPTIONAL MATCH everywhere.
+3. **Retry 3:** Abandons single-query approach entirely. Uses **query decomposition** to break the question into 2-4 independent sub-queries, executes each separately, and merges results.
+4. Best results from any attempt are saved — if later attempts fail, earlier successful results are restored.
+5. If all retries fail, the smart fallback system finds the nearest working pre-built function and executes it with transparency.
 
 ---
 
@@ -195,8 +217,8 @@ If the executor fails (bad Cypher, empty results), it does not just error out:
 
 54 question plans define the system's analytical capabilities. Each plan has:
 
-- Semantic routing examples (5-7 per plan) for cosine similarity matching
-- A target function name for deterministic execution (or null for dynamic Cypher with contract bypass)
+- Semantic routing examples (5-7 per plan) matched using **all-MiniLM-L6-v2** sentence transformer embeddings (384-dim, with TF-IDF fallback)
+- A target function name for deterministic execution (all 54 plans now have real functions — zero null-function plans)
 - A data contract for output verification
 - A criticality flag that locks the plan when matched (no LLM override)
 - Entity-to-param auto injection (extracted IDs are automatically merged into function params)
@@ -214,7 +236,7 @@ For truly novel questions (no plan match, no keyword match), the system falls th
 | 1 | Groq LLaMA 3.3 70B | Gemini 1.5 Flash | Guardrail, intent classification |
 | 2 | DeepSeek Chat | Gemini 1.5 Flash | Function selection, Cypher generation, answer formatting |
 | 3 | DeepSeek Reasoner | Gemini 1.5 Flash | Complex multi-hop queries (DETECT, COMPARE) |
-| Embed | Local TF-IDF | - | Semantic cache, plan routing | Free |
+| Embed | all-MiniLM-L6-v2 (local ONNX) | TF-IDF fallback | Plan routing, GraphRAG retrieval, semantic cache | Free, ~23MB model |
 
 DeepSeek Reasoner produces a chain of thought block before answering, improving accuracy on complex queries by reasoning through relationship directions and join keys before generating Cypher. The think block is stripped before JSON parsing.
 
@@ -248,14 +270,14 @@ Scoring: **Fully correct** = numeric/entity-level match with expected logic. **P
 
 ## Function Library
 
-54 hardcoded Cypher functions organized by intent:
+72 hardcoded Cypher functions organized by intent:
 
 | Intent | Count | Examples |
 |--------|-------|----------|
 | LOOKUP | 5 | getCustomer, getOrder, getProduct, getBillingDoc, getDelivery |
 | TRAVERSE | 8 | traceDocument, traceOrderJourney, getBusinessPartnerToBillingDocumentPath, getO2CGraphSchemaDesign |
-| AGGREGATE | 24 | getRevenueConcentration, getPlantRevenueRanking, getActiveBillingTotals, getJournalEntryDistribution, getPaymentsCollectedThisMonth, getPaymentsCollectedLastMonth, getSalesRevenueLastMonth, getOrdersPlacedByCustomer, getProductsStoredInPlant, getCancelledInvoicesSummary |
-| DETECT | 15 | findBrokenFlows, getFullAnomalyReport, getCancelledAfterPayment, getDeliveryFulfillmentRate, getDeliveriesNotBilled, getOrderToPaymentCycleTime, getPaymentsWithoutJournalEntries, getUnpaidActiveBillingDocs |
+| AGGREGATE | 38 | getRevenueConcentration, getPlantRevenueRanking, getActiveBillingTotals, getO2CHealthSummary, getARAgingBuckets, getDSOPerCustomer, getCreditExposure, getCancellationRateByCustomer, getCurrencyAnalysis, getCrossDomainSummary, getOrderValueDistribution, getDeliveryStatusBreakdown, getIncotermsAnalysis, getDeliveryLeadTime, getHighValueOrders, getDebitCreditTotals, getSingleCustomerProducts |
+| DETECT | 19 | findBrokenFlows, getFullAnomalyReport, getCancelledAfterPayment, getDeliveryFulfillmentRate, getBlockedCustomersWithOrders, getOverdueDeliveries, getCustomerOrderRecency, getFIPostingGaps, getUnpaidActiveBillingDocs |
 | COMPARE | 2 | compareCustomerRevenue, compareCustomerOrders |
 | META | 2 | getSystemPipelineDescription, getO2CGraphSchemaDesign |
 
@@ -465,11 +487,11 @@ docker-compose up --build
 | Frontend | React 18 + Vite + TypeScript | Fast HMR, type safety, modern tooling |
 | Graph Visualization | react-force-graph-2d | WebGL-accelerated force-directed layouts |
 | Backend | Node.js + Express + TypeScript | Type-safe API layer with middleware support |
-| Pipeline | LangGraph (custom 6-node optimized pipeline) | Deterministic state machine with typed state, merged guardrail/intent/complexity node |
+| Pipeline | LangGraph (custom 6-node optimized pipeline) | Deterministic state machine with typed state, query decomposition, escalating retries |
 | Graph DB | Neo4j Aura (cloud, free tier) | Native graph traversals for O2C chain analysis |
 | Cache/Memory | Redis Cloud (free tier) | Sub-millisecond reads, TTL expiry, semantic cache |
 | LLM Providers | Groq + DeepSeek + Gemini (all free tier) | Zero-cost with automatic fallback chain |
-| Embeddings | Local TF-IDF (no external API) | Zero-cost, zero-latency, no API dependency |
+| Embeddings | all-MiniLM-L6-v2 (local ONNX, ~23MB) + TF-IDF fallback | Real semantic understanding, zero API cost, cached locally |
 | Containerization | Docker + Docker Compose | Multi-stage builds, health checks, service orchestration |
 ---
 
@@ -479,7 +501,7 @@ docker-compose up --build
 |---|---|---|---|
 | Novel prompt coverage depends on plan examples | Misrouting risk for unseen phrasing | Semantic plan router + keyword + LLM fallback + smart fallback to nearest function | Add paraphrase augmentation + periodic plan mining |
 | Historical dataset (April 2025) vs current date | "Today" and "this month" queries return empty | Context-aware error messages explain date range + suggest April 2025 | Auto-detect dataset date range and rewrite temporal queries |
-| Complex multi-hop queries (6+ nodes) via LLM Cypher | Under 20% first-attempt success rate for novel multi-hop queries | Pre-built functions for all critical multi-hop patterns (DSO, cycle time, reconciliation) + smart fallback | Expand pre-built library based on query analytics |
+| Complex multi-hop queries (6+ nodes) via LLM Cypher | Under 20% first-attempt success rate for novel multi-hop queries | Pre-built functions for all critical multi-hop patterns + query decomposition + escalating retries (Tier 2 → Tier 3 → decomposition) | Expand pre-built library based on query analytics |
 | Dynamic Cypher field names vs contract schemas | Contract verifier rejects valid dynamic results | Contract verification skipped for dynamic Cypher; best-results fallback | Auto-learn field name mappings from successful queries |
-| Answer formatter still uses LLM wording | Rare wording-level drift despite correct rows | Contract verification + routing trace in prompt + field constraints | Optional deterministic templating for all critical plans |
+| Answer formatting accuracy | LLM can hallucinate numbers or misformat counts as currency | 17 deterministic answer templates for known functions (zero LLM). Post-LLM validation cross-checks numbers against actual data for novel queries. | Expand template coverage to all 72 functions |
 | SAP status code interpretation (e.g., 'C' = complete vs blocked) | LLM may misinterpret domain-specific codes | Field-type hints in executor prompt with SAP-specific context | Add SAP domain glossary to system prompt |
