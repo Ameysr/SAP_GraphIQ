@@ -1,5 +1,6 @@
 import { getRedis } from '../redis.js';
 import { getLocalEmbedding } from './embedding.js';
+import { cosineSimilarity } from '../utils/math.js';
 import crypto from 'crypto';
 
 const CACHE_TTL = 86400; // 24 hours
@@ -13,17 +14,7 @@ function hashKey(text: string): string {
   return 'semcache:' + crypto.createHash('sha256').update(payload).digest('hex').substring(0, 16);
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(magA) * Math.sqrt(magB);
-  return denom === 0 ? 0 : dot / denom;
-}
+
 
 export async function saveToCache(question: string, answer: string): Promise<void> {
   try {

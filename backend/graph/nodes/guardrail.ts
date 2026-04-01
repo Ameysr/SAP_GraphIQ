@@ -239,6 +239,34 @@ export async function guardrail(
     }
   }
 
+  // ── Layer 1b: Obviously off-topic detection (instant, no LLM) ──
+  // Catches general-knowledge / creative / personal questions that should never
+  // reach the pipeline — saves an LLM call.
+  const OFF_TOPIC_PATTERNS = [
+    /\b(?:weather|forecast|temperature)\b/i,
+    /\b(?:joke|funny|humor|laugh)\b/i,
+    /\b(?:poem|poetry|song|lyrics|story|write me)\b/i,
+    /\b(?:recipe|cook|food|restaurant)\b/i,
+    /\b(?:code|program|javascript|python|html|css|react)\b/i,
+    /\b(?:translate to|translate from|speak|language)\b/i,
+    /\b(?:news|politics|election|sports|game|movie|music)\b/i,
+    /\b(?:who is the president|capital of|population of)\b/i,
+    /\b(?:meaning of life|philosophy|opinion|feel|believe)\b/i,
+  ];
+  // But don't block if SAP/O2C terms are also present
+  const hasSAPContext = /\b(?:order|customer|delivery|billing|invoice|payment|product|plant|sales|sap|o2c)\b/i.test(msg);
+  if (!hasSAPContext) {
+    for (const pattern of OFF_TOPIC_PATTERNS) {
+      if (pattern.test(msg)) {
+        console.log(`  [Guardrail] Off-topic detected: ${pattern}`);
+        return {
+          isRelevant: false,
+          answer: `I'm designed specifically for SAP Order-to-Cash analysis. I can help with questions like:\n\n• "Show top 5 customers by revenue"\n• "Find orders that were never delivered"\n• "What is the O2C cycle time per customer?"\n• "Trace the journey of sales order 740544"\n\nPlease ask something about orders, customers, deliveries, billing, or payments.`,
+        };
+      }
+    }
+  }
+
   // ── Layer 2: Short follow-up auto-allow ──
   if (state.userMessage.length < 60 && state.history.length > 0) {
     console.log(`  [Guardrail] Layer 2: Short follow-up with history — auto-allowed`);
@@ -318,7 +346,7 @@ Return relevant: false for: general knowledge, coding help, creative writing, pe
         console.log(`  [Guardrail] Low confidence (${confidence}) — blocked`);
         return {
           isRelevant: false,
-          answer: 'I\'m not confident this question relates to the SAP O2C dataset. Please rephrase.',
+          answer: `I'm not confident I can answer this about the SAP O2C dataset. Here are some things I can help with:\n\n• Customer & order analytics (revenue, rankings, distributions)\n• Delivery & fulfillment tracking\n• Billing & payment analysis (aging, DSO, clearing times)\n• Anomaly detection (broken flows, missing deliveries)\n• End-to-end O2C journey tracing\n\nTry rephrasing your question with specific SAP terms.`,
           usedFallback: response.usedFallback,
         };
       }
@@ -327,7 +355,7 @@ Return relevant: false for: general knowledge, coding help, creative writing, pe
         console.log(`  [Guardrail] Irrelevant (confidence: ${confidence})`);
         return {
           isRelevant: false,
-          answer: 'This system is designed to answer questions about the SAP Order-to-Cash dataset only.',
+          answer: `I'm designed specifically for SAP Order-to-Cash analysis. I can help with questions like:\n\n• "Show top 5 customers by revenue"\n• "Find orders that were never delivered"\n• "What is the AR aging breakdown?"\n• "Compare customer 320000082 vs 320000083"\n\nPlease ask something about orders, customers, deliveries, billing, or payments.`,
           usedFallback: response.usedFallback,
         };
       }

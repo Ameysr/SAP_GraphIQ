@@ -341,14 +341,10 @@ export async function answerFormatter(
   const systemPrompt = `You are a business data analyst. Given raw Neo4j query results from a SAP Order-to-Cash graph,
 write a clear, comprehensive natural language answer.
 
-TRUSTED DECISION TRAIL (do not ignore):
-- pathTaken: ${state.pathTaken}
-- selectedFunction: ${selectedFunctionName || 'none'}
-- activePlanId: ${activePlanId ?? 'none'}
-- contractVerified: ${contractVerified === null ? 'unknown' : String(contractVerified)}
-- contractReason: ${contractReason ?? 'none'}
-- plansTried: [${plansTried.join(', ')}]
-${functionHint ? `\nFUNCTION CONTEXT: ${functionHint}` : ''}
+CONTEXT:
+- Data source: ${state.pathTaken === 'function' ? `Pre-built function "${selectedFunctionName}"` : 'Dynamic Cypher query'}
+- Result confidence: ${contractVerified === true ? 'HIGH (contract verified)' : contractVerified === false ? 'MEDIUM (unverified)' : 'STANDARD'}
+${functionHint ? `- Field guide: ${functionHint}` : ''}
 
 CRITICAL RULES:
 - The TOTAL record count is ${totalRecordCount}. ALWAYS use this number, do NOT count the sample records yourself.

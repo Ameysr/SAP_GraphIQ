@@ -184,7 +184,11 @@ router.post('/', chatLimiter, async (req: Request, res: Response): Promise<void>
 
     res.json(response);
   } catch (err: unknown) {
+    // Log full error details server-side only
     console.error('[Chat] Pipeline error:', err);
+
+    // Sanitize: never expose internal stack traces / DB errors to frontend
+    const safeMessage = 'Something went wrong processing your question. Please try again.';
 
     recordQuery({
       intent: '',
@@ -201,15 +205,16 @@ router.post('/', chatLimiter, async (req: Request, res: Response): Promise<void>
     });
 
     res.status(500).json({
-      answer: 'Something went wrong processing your question. Please try again.',
+      answer: safeMessage,
       nodesReferenced: [],
-      confidence: '',
+      confidence: 'low',
       metadata: {
-        tier: 1,
+        tier: 0,
         cacheHit: false,
         latencyMs: Date.now() - startTime,
         usedFallback: false,
-        pathTaken: '',
+        pathTaken: 'error',
+        error: true,
       },
     });
   }

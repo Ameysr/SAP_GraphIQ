@@ -19,7 +19,7 @@ This is not a simple chatbot wrapper. Every design decision was made to solve re
 When dynamic Cypher generation fails after all retries, the system does not return "no data found." Instead, it scans plan candidates for the nearest plan with a real pre built function, executes it, and prefixes the answer with transparency: *"I couldn't answer your exact question directly, but here's the closest available analysis."* This is the industry standard approach used by SAP Analytics Cloud match to the nearest available report rather than silently fail.
 
 ### 3. GraphRAG with Few Shot Retrieval
-For novel questions outside the function library, the system embeds the user question, retrieves the top K most similar Cypher examples from a curated 60 query library, builds a minimal schema subset relevant to the question, and sends everything as context to the LLM a structured retrieval pipeline, not a raw prompt.
+For novel questions outside the function library, the system embeds the user question, retrieves the top K most similar Cypher examples from a curated 64 query library, builds a minimal schema subset relevant to the question, and sends everything as context to the LLM a structured retrieval pipeline, not a raw prompt.
 
 ### 4. Context Aware Error Handling
 When queries return zero results, the system provides targeted feedback instead of generic "try rephrasing" messages:
@@ -49,11 +49,11 @@ When Cypher generation fails, each retry uses a **fundamentally different approa
 | 2 | Simplified approach | **Tier 3** (deepseek-reasoner) | Aggressive simplification, 1-2 MATCH clauses only |
 | 3 | Query decomposition | Tier 2 | Breaks question into 2-4 sub-queries |
 
-### 10. Schema-Aware Cypher Validation
-Before executing LLM-generated Cypher, the system validates it against the known graph schema: checks node labels against 16 valid types, relationship types against 16 valid edges, and detects missing `toFloat()` on amount fields. Invalid queries are caught before hitting Neo4j, saving round-trips and improving retry quality.
+### 10. Schema Aware Cypher Validation
+Before executing LLM-generated Cypher, the system validates it against the known graph schema: checks node labels against 18 valid types, relationship types against 18 valid edges, and detects missing `toFloat()` on amount fields. Invalid queries are caught before hitting Neo4j, saving round-trips and improving retry quality.
 
 ### 11. Multi-Layer Memory
-Redis backed conversation history (last 10 messages) + entity memory resolve pronouns across turns: *"Show me the order"* resolves to the exact ID discussed moments ago. Semantic cache (cosine similarity > 0.85) skips the full pipeline for repeated or similar questions.
+Redis backed conversation history (last 20 messages / 10 Q&A pairs) + entity memory resolve pronouns across turns: *"Show me the order"* resolves to the exact ID discussed moments ago. The last 2 Q&A pairs are injected into the Cypher generation prompt, enabling multi-turn follow-ups like "What about their deliveries?" Semantic cache (cosine similarity > 0.85) skips the full pipeline for repeated or similar questions.
 
 ### 12. Multi Layer Security
 Input sanitization strips Cypher injection attempts (`CREATE`, `DELETE`, `DROP`, `MERGE`). Rate limiting caps requests at 10/minute per IP. The guardrail node rejects off topic queries before any database access. Entity extraction uses regex, not LLM, to prevent prompt injection through entity names.

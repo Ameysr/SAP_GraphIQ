@@ -111,12 +111,14 @@ const VALID_NODE_LABELS = new Set([
   'DeliveryHeader', 'DeliveryItem', 'BillingHeader', 'BillingItem',
   'BillingCancellation', 'JournalEntry', 'Payment', 'Plant', 'Address',
   'CustomerCompany', 'CustomerSalesArea', 'ProductPlant',
+  'ProductDescription', 'ProductStorageLocation',
 ]);
 
 const VALID_RELATIONSHIPS = new Set([
   'PLACED', 'HAS_ITEM', 'HAS_SCHEDULE_LINE', 'REFERENCES', 'FULFILLED_BY',
   'PART_OF', 'AT_PLANT', 'BILLED_IN', 'POSTED_AS', 'PAID_BY', 'CANCELS',
   'HAS_ADDRESS', 'ASSIGNED_TO_COMPANY', 'SELLS_THROUGH', 'STOCKED_AT', 'IN_PLANT',
+  'HAS_DESCRIPTION', 'FOR_PRODUCT',
 ]);
 
 function validateCypherSchema(cypher: string): string[] {
@@ -400,7 +402,18 @@ RESPONSE FORMAT — respond with ONLY valid JSON:
   "cypher": "MATCH (n:NodeType) WHERE ... RETURN ..."
 }`;
 
-  const userPrompt = `Question: "${state.resolvedMessage}"
+  // ── CONVERSATION CONTEXT ──────────────────────────────────────────────────
+  // Inject last 2 Q&A pairs so the LLM understands multi-turn context.
+  // E.g., "What about their deliveries?" after asking about a customer.
+  let conversationContext = '';
+  if (state.history && state.history.length > 0) {
+    const recentPairs = state.history.slice(-4); // last 2 Q&A pairs (4 messages)
+    conversationContext = recentPairs
+      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.substring(0, 150)}`)
+      .join('\n');
+  }
+
+  const userPrompt = `${conversationContext ? `Recent conversation context:\n${conversationContext}\n\n` : ''}Question: "${state.resolvedMessage}"
 Extracted entities: ${JSON.stringify(state.extractedEntities)}`;
 
   try {

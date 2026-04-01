@@ -9,7 +9,6 @@ import { getMetrics } from './services/metrics.js';
 import { getRedis, closeRedis } from './redis.js';
 import { closeDriver, runQuery } from './db.js';
 import { getLLMStats } from './services/llm.js';
-import { initEmbeddings } from './services/embedding.js';
 import { initQuestionPlans } from './services/questionPlans.js';
 
 // Load .env from project root in dev; in production (Render) env vars are injected natively
@@ -126,14 +125,39 @@ app.get('/api/metrics', (_req, res) => {
 // ── QUERY SUGGESTIONS ─────────────────────────────────────────────────────────
 app.get('/api/suggestions', (_req, res) => {
   res.json({
+    capabilities: [
+      'Sales order analysis', 'Customer analytics', 'Delivery tracking',
+      'Billing & invoicing', 'Payment analysis', 'Anomaly detection',
+      'AR aging & DSO', 'O2C cycle time', 'Revenue insights',
+    ],
     suggestions: [
-      { question: 'Show me the top 5 customers by revenue', intent: 'AGGREGATE', complexity: 'SIMPLE' },
-      { question: 'Which delivery document has the most distinct products?', intent: 'AGGREGATE', complexity: 'MEDIUM' },
-      { question: 'Find all orders that were never delivered', intent: 'DETECT', complexity: 'MEDIUM' },
-      { question: 'Give me a complete anomaly report', intent: 'DETECT', complexity: 'COMPLEX' },
-      { question: 'Trace the complete journey of sales order 740544', intent: 'TRAVERSE', complexity: 'COMPLEX' },
-      { question: 'Compare customer 320000082 vs 320000083 revenue', intent: 'COMPARE', complexity: 'MEDIUM' },
-      { question: 'Show me invoices cancelled after payment', intent: 'DETECT', complexity: 'SIMPLE' },
+      // Analytics
+      { question: 'Show me the top 5 customers by revenue', category: 'Analytics', intent: 'AGGREGATE' },
+      { question: 'What is the AR aging breakdown?', category: 'Analytics', intent: 'AGGREGATE' },
+      { question: 'What is the DSO (Days Sales Outstanding) per customer?', category: 'Analytics', intent: 'AGGREGATE' },
+      { question: 'Show the order value distribution', category: 'Analytics', intent: 'AGGREGATE' },
+      { question: 'What is the overall O2C health summary?', category: 'Analytics', intent: 'AGGREGATE' },
+      // Anomaly Detection
+      { question: 'Find all orders that were never delivered', category: 'Anomaly Detection', intent: 'DETECT' },
+      { question: 'Show invoices cancelled after payment', category: 'Anomaly Detection', intent: 'DETECT' },
+      { question: 'Give me a complete anomaly report', category: 'Anomaly Detection', intent: 'DETECT' },
+      { question: 'Which deliveries are overdue?', category: 'Anomaly Detection', intent: 'DETECT' },
+      { question: 'Find payments without journal entries', category: 'Anomaly Detection', intent: 'DETECT' },
+      // Traversal
+      { question: 'Trace the complete journey of sales order 740544', category: 'Tracing', intent: 'TRAVERSE' },
+      { question: 'Show the end-to-end flow for customer 320000082', category: 'Tracing', intent: 'TRAVERSE' },
+      // Comparison
+      { question: 'Compare customer 320000082 vs 320000083 revenue', category: 'Comparison', intent: 'COMPARE' },
+      // Lookup
+      { question: 'Show me details for customer 320000082', category: 'Lookup', intent: 'LOOKUP' },
+      { question: 'What products are stored in plant 1710?', category: 'Lookup', intent: 'LOOKUP' },
+      // Financial
+      { question: 'What is the credit exposure by customer?', category: 'Financial', intent: 'AGGREGATE' },
+      { question: 'Show the cancellation rate by customer', category: 'Financial', intent: 'AGGREGATE' },
+      { question: 'What are the debit vs credit totals?', category: 'Financial', intent: 'AGGREGATE' },
+      // Schema
+      { question: 'What is the graph schema design?', category: 'Schema', intent: 'TRAVERSE' },
+      { question: 'How does your NL system translate to graph queries?', category: 'Schema', intent: 'TRAVERSE' },
     ],
   });
 });
@@ -245,9 +269,7 @@ server = app.listen(PORT, async () => {
   console.log(`   Metrics:     http://localhost:${PORT}/api/metrics`);
   console.log(`   Suggestions: http://localhost:${PORT}/api/suggestions`);
   await validateSchema();
-  // Initialize semantic embeddings model (downloads ~23MB on first run)
-  await initEmbeddings();
-  // Re-embed question plans with semantic model
+  // Load question plans with TF-IDF embeddings
   await initQuestionPlans();
   console.log('');
 });

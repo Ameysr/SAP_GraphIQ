@@ -3,28 +3,31 @@
 // similar examples at query time, and builds a mini-schema for the LLM.
 
 import { getLocalEmbedding } from './embedding.js';
+import { cosineSimilarity } from '../utils/math.js';
 import { QUERY_LIBRARY, type QueryExample } from './queryLibrary.js';
 
 // ── SCHEMA FRAGMENTS ──────────────────────────────────────────────────────────
 // Each node type's schema as a string — only the relevant ones are sent to LLM
 const NODE_SCHEMAS: Record<string, string> = {
-  Customer: 'Customer {id(string), businessPartnerFullName(string), businessPartnerName(string), businessPartnerIsBlocked(boolean), customer(string), creationDate(string)}',
-  SalesOrder: 'SalesOrder {id(string), salesOrder(string), soldToParty(string = customer id), totalNetAmount(string — use toFloat()), transactionCurrency(string), salesOrganization(string), creationDate(string), overallDeliveryStatus(string), overallOrdReltdBillgStatus(string), customerPaymentTerms(string), incotermsClassification(string), distributionChannel(string), requestedDeliveryDate(string)}',
-  SalesOrderItem: 'SalesOrderItem {id(string = salesOrder_salesOrderItem), salesOrder(string), salesOrderItem(string), material(string), netAmount(string — use toFloat()), materialGroup(string)}',
+  Customer: 'Customer {id(string, e.g. "320000083"), businessPartnerFullName(string), businessPartnerName(string), businessPartnerIsBlocked(boolean), customer(string), creationDate(string)}',
+  SalesOrder: 'SalesOrder {id(string), salesOrder(string, e.g. "740586"), soldToParty(string = customer id), totalNetAmount(string — use toFloat()), transactionCurrency(string, e.g. "INR"), salesOrganization(string, e.g. "IN01"), creationDate(string, e.g. "2025-04-10"), overallDeliveryStatus(string), overallOrdReltdBillgStatus(string), customerPaymentTerms(string, e.g. "Z001"/"Z009"), incotermsClassification(string), distributionChannel(string), requestedDeliveryDate(string)}',
+  SalesOrderItem: 'SalesOrderItem {id(string = salesOrder_salesOrderItem), salesOrder(string), salesOrderItem(string, e.g. "10"), material(string), netAmount(string — use toFloat()), materialGroup(string)}',
   ScheduleLine: 'ScheduleLine {id(string), salesOrder(string), salesOrderItem(string), scheduleLine(string), confirmedDeliveryDate(string)}',
-  Product: 'Product {id(string), product(string), productDescription(string), productGroup(string)}',
-  DeliveryHeader: 'DeliveryHeader {id(string), deliveryDocument(string), creationDate(string), shippingPoint(string), overallGoodsMovementStatus(string)}',
-  DeliveryItem: 'DeliveryItem {id(string), deliveryDocument(string), deliveryDocumentItem(string), plant(string), referenceSdDocument(string = original salesOrder), actualDeliveryQuantity(string)}',
-  BillingHeader: 'BillingHeader {id(string), billingDocument(string), billingDocumentType(string — F2=invoice, S1=cancellation), totalNetAmount(string — use toFloat()), transactionCurrency(string), billingDocumentDate(string), accountingDocument(string), soldToParty(string = customer id), billingDocumentIsCancelled(boolean)}',
+  Product: 'Product {id(string), product(string, e.g. "MZ-FG-S300"), productDescription(string), productGroup(string)}',
+  DeliveryHeader: 'DeliveryHeader {id(string), deliveryDocument(string, e.g. "800066830"), creationDate(string), deliveryDate(string), shippingPoint(string), overallGoodsMovementStatus(string, "A"=not moved, "C"=complete)}',
+  DeliveryItem: 'DeliveryItem {id(string), deliveryDocument(string), deliveryDocumentItem(string), plant(string, e.g. "WB05"), referenceSdDocument(string = original salesOrder), actualDeliveryQuantity(string)}',
+  BillingHeader: 'BillingHeader {id(string), billingDocument(string, e.g. "91150188"), billingDocumentType(string — F2=invoice, S1=cancellation), totalNetAmount(string — use toFloat()), transactionCurrency(string), billingDocumentDate(string), accountingDocument(string), soldToParty(string = customer id), billingDocumentIsCancelled(boolean)}',
   BillingItem: 'BillingItem {id(string), billingDocument(string), billingDocumentItem(string), material(string), netAmount(string — use toFloat()), referenceSdDocument(string)}',
   BillingCancellation: 'BillingCancellation {id(string), billingDocument(string), cancelledBillingDocument(string), totalNetAmount(string)}',
   JournalEntry: 'JournalEntry {id(string), accountingDocument(string), accountingDocumentItem(string), glAccount(string), amountInTransactionCurrency(string — use toFloat())}',
   Payment: 'Payment {id(string), accountingDocument(string), accountingDocumentItem(string), clearingDate(string), amountInTransactionCurrency(string — use toFloat()), customer(string)}',
-  Plant: 'Plant {id(string), plant(string), plantName(string)}',
+  Plant: 'Plant {id(string), plant(string, e.g. "WB05"), plantName(string)}',
   Address: 'Address {id(string), businessPartner(string), cityName(string), country(string), postalCode(string)}',
   CustomerCompany: 'CustomerCompany {id(string), customer(string), companyCode(string)}',
   CustomerSalesArea: 'CustomerSalesArea {id(string), customer(string), salesOrganization(string)}',
-  ProductPlant: 'ProductPlant {id(string), product(string), plant(string)}',
+  ProductPlant: 'ProductPlant {id(string), product(string), plant(string), profitCenter(string)}',
+  ProductDescription: 'ProductDescription {id(string), product(string), language(string), productDescription(string)}',
+  ProductStorageLocation: 'ProductStorageLocation {id(string), product(string), plant(string), storageLocation(string)}',
 };
 
 // Relationships that involve specific node types
@@ -33,7 +36,7 @@ const RELATIONSHIP_MAP: Record<string, string[]> = {
   SalesOrder: ['(Customer)-[:PLACED]->(SalesOrder)', '(SalesOrder)-[:HAS_ITEM]->(SalesOrderItem)'],
   SalesOrderItem: ['(SalesOrder)-[:HAS_ITEM]->(SalesOrderItem)', '(SalesOrderItem)-[:HAS_SCHEDULE_LINE]->(ScheduleLine)', '(SalesOrderItem)-[:REFERENCES]->(Product)', '(SalesOrderItem)-[:FULFILLED_BY]->(DeliveryItem)'],
   ScheduleLine: ['(SalesOrderItem)-[:HAS_SCHEDULE_LINE]->(ScheduleLine)'],
-  Product: ['(SalesOrderItem)-[:REFERENCES]->(Product)', '(Product)-[:STOCKED_AT]->(ProductPlant)'],
+  Product: ['(SalesOrderItem)-[:REFERENCES]->(Product)', '(Product)-[:STOCKED_AT]->(ProductPlant)', '(Product)-[:HAS_DESCRIPTION]->(ProductDescription)'],
   DeliveryHeader: ['(DeliveryItem)-[:PART_OF]->(DeliveryHeader)', '(DeliveryHeader)-[:BILLED_IN]->(BillingItem)'],
   DeliveryItem: ['(SalesOrderItem)-[:FULFILLED_BY]->(DeliveryItem)', '(DeliveryItem)-[:PART_OF]->(DeliveryHeader)', '(DeliveryItem)-[:AT_PLANT]->(Plant)'],
   BillingHeader: ['(BillingItem)-[:PART_OF]->(BillingHeader)', '(BillingHeader)-[:POSTED_AS]->(JournalEntry)', '(BillingHeader)-[:PAID_BY]->(Payment)', '(BillingCancellation)-[:CANCELS]->(BillingHeader)'],
@@ -46,6 +49,8 @@ const RELATIONSHIP_MAP: Record<string, string[]> = {
   CustomerCompany: ['(Customer)-[:ASSIGNED_TO_COMPANY]->(CustomerCompany)'],
   CustomerSalesArea: ['(Customer)-[:SELLS_THROUGH]->(CustomerSalesArea)'],
   ProductPlant: ['(Product)-[:STOCKED_AT]->(ProductPlant)', '(ProductPlant)-[:IN_PLANT]->(Plant)'],
+  ProductDescription: ['(Product)-[:HAS_DESCRIPTION]->(ProductDescription)'],
+  ProductStorageLocation: ['(ProductStorageLocation)-[:FOR_PRODUCT]->(Product)'],
 };
 
 // Critical notes that are always included
@@ -60,6 +65,7 @@ CRITICAL RULES:
 - DeliveryItem has NO material field. To get products: (SalesOrderItem)-[:FULFILLED_BY]->(DeliveryItem) then (SalesOrderItem)-[:REFERENCES]->(Product)
 - To join BillingHeader to Payment for clearing time: use Payment.accountingDocument = BillingHeader.accountingDocument
 - For aggregation queries (COUNT, SUM) — put LIMIT AFTER the aggregation, NOT before
+⚠️ DATASET DATE RANGE: The SAP O2C data primarily covers April 2025. Queries using date() ("today"), "this month", or "last 30 days" will likely return EMPTY results. If the user asks about "this month" or "recent", consider filtering for April 2025 instead.
 ⚠️ USE ONLY THE RELATIONSHIPS LISTED BELOW. DO NOT INVENT NEW ONES.`;
 
 // ── EMBEDDING INDEX ───────────────────────────────────────────────────────────
@@ -81,17 +87,7 @@ function embedLibrary(): void {
 
 
 
-function cosineSim(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(magA) * Math.sqrt(magB);
-  return denom === 0 ? 0 : dot / denom;
-}
+
 
 // ── PUBLIC API ────────────────────────────────────────────────────────────────
 
@@ -119,7 +115,7 @@ export async function retrieveContext(question: string, topK: number = 5): Promi
   // Score all examples
   const scored = QUERY_LIBRARY
     .filter(ex => ex.embedding)
-    .map(ex => ({ example: ex, score: cosineSim(queryEmb, ex.embedding!) }))
+    .map(ex => ({ example: ex, score: cosineSimilarity(queryEmb, ex.embedding!) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, topK);
 

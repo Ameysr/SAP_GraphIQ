@@ -644,6 +644,59 @@ ORDER BY revenue DESC`,
     schemaNodes: ['BillingHeader', 'Customer'],
   },
 
+  // ────── DATE RANGE & TEMPORAL PATTERNS ──────
+  {
+    question: 'Show orders placed in April 2025',
+    cypher: `MATCH (so:SalesOrder)
+WHERE so.creationDate STARTS WITH '2025-04'
+OPTIONAL MATCH (c:Customer {id: so.soldToParty})
+RETURN so.salesOrder, so.creationDate, so.totalNetAmount, so.transactionCurrency, c.businessPartnerFullName AS customer
+ORDER BY so.creationDate DESC LIMIT 50`,
+    schemaNodes: ['SalesOrder', 'Customer'],
+  },
+  {
+    question: 'Show the 5 most recent orders by creation date',
+    cypher: `MATCH (so:SalesOrder)
+WHERE so.creationDate IS NOT NULL
+OPTIONAL MATCH (c:Customer {id: so.soldToParty})
+RETURN so.salesOrder, so.creationDate, toFloat(so.totalNetAmount) AS amount, so.transactionCurrency, c.businessPartnerFullName AS customer
+ORDER BY so.creationDate DESC LIMIT 5`,
+    schemaNodes: ['SalesOrder', 'Customer'],
+  },
+  {
+    question: 'What deliveries were created between April 1 and April 15, 2025?',
+    cypher: `MATCH (dh:DeliveryHeader)
+WHERE date(dh.creationDate) >= date('2025-04-01') AND date(dh.creationDate) < date('2025-04-16')
+RETURN dh.deliveryDocument, dh.creationDate, dh.overallGoodsMovementStatus
+ORDER BY dh.creationDate DESC`,
+    schemaNodes: ['DeliveryHeader'],
+  },
+
+  // ────── SIMPLE LIST & PERCENTAGE PATTERNS ──────
+  {
+    question: 'List all plants with their names',
+    cypher: `MATCH (pl:Plant)
+RETURN pl.plant AS plantId, pl.plantName AS plantName
+ORDER BY pl.plantName`,
+    schemaNodes: ['Plant'],
+  },
+  {
+    question: 'List all customers',
+    cypher: `MATCH (c:Customer)
+RETURN c.id AS customerId, c.businessPartnerFullName AS name, c.businessPartnerIsBlocked AS blocked
+ORDER BY c.businessPartnerFullName LIMIT 50`,
+    schemaNodes: ['Customer'],
+  },
+  {
+    question: 'What percentage of orders have been fully delivered?',
+    cypher: `MATCH (so:SalesOrder)
+WITH count(so) AS total,
+     sum(CASE WHEN so.overallDeliveryStatus = 'C' THEN 1 ELSE 0 END) AS fullyDelivered
+RETURN total AS totalOrders, fullyDelivered,
+       round(toFloat(fullyDelivered) / toFloat(total) * 10000) / 100.0 AS deliveredPct`,
+    schemaNodes: ['SalesOrder'],
+  },
+
   // ────── CROSS-DOMAIN SUMMARY ──────
   {
     question: 'For each customer, show order count, delivery count, and billing total',
@@ -673,41 +726,7 @@ RETURN totalOrders, totalDeliveries, totalInvoices, totalBilled, totalPayments, 
     schemaNodes: ['SalesOrder', 'DeliveryHeader', 'BillingHeader', 'Payment'],
   },
 
-  // ────── CUSTOMER INACTIVITY / TEMPORAL ──────
-  {
-    question: 'Which customers have not placed any orders in the last 6 months?',
-    cypher: `MATCH (c:Customer)
-OPTIONAL MATCH (c)-[:PLACED]->(so:SalesOrder)
-WITH c, collect(so.creationDate) AS orderDates
-WITH c, CASE WHEN size(orderDates) = 0 THEN null
-            ELSE reduce(latest = orderDates[0], d IN orderDates | CASE WHEN d > latest THEN d ELSE latest END)
-       END AS lastOrderDate
-WHERE lastOrderDate IS NULL OR lastOrderDate < toString(date() - duration('P180D'))
-RETURN c.businessPartnerFullName AS customer, c.id AS customerId,
-       lastOrderDate, size(orderDates) AS totalOrders
-ORDER BY lastOrderDate ASC
-LIMIT 50`,
-    schemaNodes: ['Customer', 'SalesOrder'],
-  },
-  {
-    question: 'Which customers have not ordered anything in the last 60 days?',
-    cypher: `MATCH (c:Customer)
-OPTIONAL MATCH (c)-[:PLACED]->(so:SalesOrder)
-WITH c, collect(so.creationDate) AS orderDates
-WITH c, orderDates,
-     CASE WHEN size(orderDates) = 0 THEN null
-          ELSE reduce(latest = orderDates[0], d IN orderDates | CASE WHEN d > latest THEN d ELSE latest END)
-     END AS lastOrderDate
-WHERE lastOrderDate IS NULL OR lastOrderDate < toString(date() - duration('P60D'))
-RETURN c.businessPartnerFullName AS customer, c.id AS customerId,
-       lastOrderDate,
-       CASE WHEN lastOrderDate IS NOT NULL
-            THEN duration.between(date(lastOrderDate), date()).days
-            ELSE null END AS daysSinceLastOrder
-ORDER BY daysSinceLastOrder DESC
-LIMIT 50`,
-    schemaNodes: ['Customer', 'SalesOrder'],
-  },
+
 
   // ────── REVENUE LEAKAGE ──────
   {

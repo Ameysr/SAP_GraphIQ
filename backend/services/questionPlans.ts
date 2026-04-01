@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getLocalEmbedding } from './embedding.js';
+import { cosineSimilarity } from '../utils/math.js';
 
 export type ContractCheck =
   | { type: 'range'; field: string; min: number; max: number }
@@ -54,19 +55,7 @@ let cachedExampleEmbeddings: Array<{
   exampleEmbeddings: number[][];
 }> = [];
 
-function cosineSim(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  let dot = 0;
-  let magA = 0;
-  let magB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(magA) * Math.sqrt(magB);
-  return denom === 0 ? 0 : dot / denom;
-}
+
 
 function coerceNumber(val: unknown): number | null {
   if (typeof val === 'number' && Number.isFinite(val)) return val;
@@ -129,7 +118,7 @@ export async function getPlanCandidates(
       const bestSim =
         exampleEmbeddings.length === 0
           ? 0
-          : Math.max(...exampleEmbeddings.map((exEmb) => cosineSim(qEmb, exEmb)));
+          : Math.max(...exampleEmbeddings.map((exEmb) => cosineSimilarity(qEmb, exEmb)));
       return { plan, similarity: bestSim };
     })
     .sort((a, b) => b.similarity - a.similarity)

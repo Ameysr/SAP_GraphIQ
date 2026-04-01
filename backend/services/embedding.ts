@@ -1,23 +1,10 @@
 // ── EMBEDDING SERVICE ─────────────────────────────────────────────────────────
-// Pure TF-IDF with expanded SAP O2C domain vocabulary + synonym mapping.
+// Domain-tuned TF-IDF with expanded SAP O2C vocabulary + synonym mapping.
 // No native dependencies, works on every platform (Alpine, Render, Docker, etc.)
 
-import Groq from 'groq-sdk';
-import dotenv from 'dotenv';
-
-dotenv.config({ path: '../.env' });
-
-let groqClient: Groq | null = null;
-
-function getGroq(): Groq {
-  if (!groqClient) groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY ?? '' });
-  return groqClient;
-}
-
 // ── DOMAIN-TUNED TF-IDF EMBEDDING ─────────────────────────────────────────────
-// 100+ dimension vocabulary covering SAP O2C business terms.
+// 90+ dimension vocabulary covering SAP O2C business terms.
 // Each word maps to a dimension. Synonyms are normalized before lookup.
-// This is fast, free, deterministic, and works everywhere.
 
 const VOCAB: string[] = [
   'customer', 'order', 'sales', 'delivery', 'billing', 'invoice', 'payment',
@@ -147,118 +134,4 @@ export function getLocalEmbedding(text: string): number[] {
   const mag = Math.sqrt(vec.reduce((sum: number, v: number) => sum + v * v, 0));
   if (mag === 0) return vec;
   return vec.map((v: number) => v / mag);
-}
-
-// ── SEMANTIC EMBEDDING (same as local — single implementation) ────────────────
-// Kept as async wrapper for API compatibility with questionPlans and GraphRAG.
-
-let semanticEmbeddingCache = new Map<string, number[]>();
-const SEMANTIC_CACHE_MAX = 500;
-
-export async function getSemanticEmbedding(text: string): Promise<number[]> {
-  const key = text.trim().toLowerCase();
-  const cached = semanticEmbeddingCache.get(key);
-  if (cached) return cached;
-
-  const emb = getLocalEmbedding(text);
-  semanticEmbeddingCache.set(key, emb);
-  if (semanticEmbeddingCache.size > SEMANTIC_CACHE_MAX) {
-    const oldestKey = semanticEmbeddingCache.keys().next().value as string | undefined;
-    if (oldestKey) semanticEmbeddingCache.delete(oldestKey);
-  }
-  return emb;
-}
-
-/**
- * Synchronous embedding — used in hot paths.
- */
-export function getLocalEmbeddingSync(text: string): number[] {
-  return getLocalEmbedding(text);
-}
-
-/**
- * Initialize embeddings. No-op now (no model to load).
- * Kept for API compatibility with server.ts startup.
- */
-export async function initEmbeddings(): Promise<void> {
-  console.log('  [Embedding] ✓ Enhanced TF-IDF embeddings ready (no native dependencies)');
-}
-
-/**
- * Semantic model readiness check. Always false now (no transformer model).
- * TF-IDF is always used directly.
- */
-export function isSemanticReady(): boolean {
-  return false;
-}
-
-// ── GROQ-POWERED SEMANTIC FINGERPRINT (optional enhancement) ─────────────────
-let groqEmbeddingEnabled = (process.env.GROQ_EMBEDDING_ENABLED ?? 'false').toLowerCase() === 'true';
-let groqFailCount = 0;
-
-async function getGroqFingerprint(text: string): Promise<number[] | null> {
-  if (!groqEmbeddingEnabled || !process.env.GROQ_API_KEY) return null;
-
-  try {
-    const client = getGroq();
-    const response = await client.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'system',
-          content: `Extract exactly 10 key concepts from this SAP O2C question. Reply with ONLY a JSON array of lowercase single words. Example: ["customer","revenue","top","billing","compare"]`,
-        },
-        { role: 'user', content: text },
-      ],
-      max_tokens: 50,
-      temperature: 0,
-    });
-
-    const conceptsText = response.choices[0]?.message?.content ?? '[]';
-    const concepts = JSON.parse(conceptsText.replace(/```json\s*/g, '').replace(/\s*```/g, '')) as string[];
-    
-    const vec = new Array(VOCAB.length).fill(0);
-    for (const concept of concepts) {
-      const mapped = SYNONYMS[concept] || concept;
-      const idx = VOCAB.indexOf(mapped);
-      if (idx >= 0) vec[idx] = 2.0;
-      for (let i = 0; i < VOCAB.length; i++) {
-        if (mapped.startsWith(VOCAB[i]) || VOCAB[i].startsWith(mapped)) {
-          vec[i] = Math.max(vec[i], 1.0);
-        }
-      }
-    }
-
-    const mag = Math.sqrt(vec.reduce((sum: number, v: number) => sum + v * v, 0));
-    if (mag === 0) return null;
-    groqFailCount = 0;
-    return vec.map((v: number) => v / mag);
-  } catch (err) {
-    groqFailCount++;
-    if (groqFailCount >= 3) {
-      groqEmbeddingEnabled = false;
-      console.log('  [Embedding] Groq fingerprinting disabled after 3 failures');
-    }
-    console.error('  [Embedding] Groq fingerprint failed:', (err as Error).message?.substring(0, 60));
-    return null;
-  }
-}
-
-// ── PUBLIC API ────────────────────────────────────────────────────────────────
-export async function getEmbedding(text: string): Promise<number[] | null> {
-  // Try Groq fingerprint first (if enabled — off by default)
-  const groqEmb = await getGroqFingerprint(text);
-  if (groqEmb) {
-    console.log('  [Embedding] Groq fingerprint generated');
-    return groqEmb;
-  }
-
-  // Primary: local TF-IDF-like embedding (instant, free, no dependencies)
-  const localEmb = getLocalEmbedding(text);
-  const hasSignal = localEmb.some(v => v > 0);
-  if (hasSignal) {
-    return localEmb;
-  }
-
-  return null;
 }

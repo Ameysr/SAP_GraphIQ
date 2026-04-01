@@ -277,10 +277,13 @@ Q: "Find all orders that were never delivered"
 A: { "matched": true, "function": "findBrokenFlows", "params": { "type": "undelivered" }, "confidence": 0.92, "reasoning": "Orders with no delivery = broken flow detection, type=undelivered" }
 
 Q: "What products are ordered by only one customer?"
-A: { "matched": false, "confidence": 0.0, "reasoning": "No function handles single-customer product analysis. This needs dynamic Cypher." }
+A: { "matched": true, "function": "getSingleCustomerProducts", "params": {}, "confidence": 0.94, "reasoning": "Single-customer product analysis = getSingleCustomerProducts" }
 
 Q: "What is the average DSO per customer?"
-A: { "matched": false, "confidence": 0.0, "reasoning": "No function computes Days Sales Outstanding. This requires a custom Cypher query with date calculations." }
+A: { "matched": true, "function": "getDSOPerCustomer", "params": {}, "confidence": 0.96, "reasoning": "Days Sales Outstanding per customer = getDSOPerCustomer" }
+
+Q: "What is the weather forecast for today?"
+A: { "matched": false, "confidence": 0.0, "reasoning": "This is not related to SAP Order-to-Cash data. No function handles weather queries." }
 
 RULES:
 - confidence must be between 0.0 and 1.0

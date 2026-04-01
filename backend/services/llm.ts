@@ -1,9 +1,6 @@
 import Groq from 'groq-sdk';
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
 import type { TierNumber, LLMProvider } from '../types/index.js';
-
-dotenv.config({ path: '../.env' });
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY ?? '';
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
