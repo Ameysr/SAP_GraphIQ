@@ -4,20 +4,22 @@ An enterprise grade, AI powered analytical engine that models the SAP Order to C
 
 This is not a simple chatbot wrapper. Every design decision was made to solve real production problems: LLM hallucination, cost control, query safety, response verification, and system resilience.
 
-> **Note:** This project was an assignment with a deadline of March 26th. I continued optimizing it because I treated it as a real production accuracy problem and found it genuinely interesting to solve. The work after the 26th (semantic embeddings, query decomposition, escalating retries, deterministic answer templates) was driven purely by curiosity feel free to consider only the March 26th snapshot if needed.
+> **Note:** This project was an assignment with a deadline of March 26th. I continued optimizing it because I treated it as a real production accuracy problem and found it genuinely interesting to solve. The work after the 26th (semantic embeddings, query decomposition, escalating retries, deterministic answer templates) was driven purely by curiosity — feel free to consider only the March 26th snapshot if needed.
+>
+> **Live Demo:** [https://dodge-ai-task-lilac.vercel.app/](https://dodge-ai-task-lilac.vercel.app/)
 
 ---
 
-## What Makes This Production-Grade
+## What Makes This Production Grade
 
 ### 1. Deterministic Query Routing
-72 pre built, typed Cypher functions handle known query patterns (54 original + 18 analytics). The LLM only selects which function to call and fills parameters — no raw Cypher generation, no hallucinated data, no injection attacks. A semantic similarity router powered by **all-MiniLM-L6-v2 sentence transformer** (384-dim embeddings) hard locks the query to a hardcoded function before the LLM even sees it.
+72 pre built, typed Cypher functions handle known query patterns across 5 intents (LOOKUP, TRAVERSE, AGGREGATE, DETECT, COMPARE). The LLM only selects which function to call and fills parameters — no raw Cypher generation, no hallucinated data, no injection attacks. A semantic similarity router powered by **domain-tuned TF-IDF embeddings** (90+ dimension SAP O2C vocabulary with synonym normalization and phrase boosting) hard locks the query to a hardcoded function before the LLM even sees it.
 
 ### 2. Smart Fallback System
 When dynamic Cypher generation fails after all retries, the system does not return "no data found." Instead, it scans plan candidates for the nearest plan with a real pre built function, executes it, and prefixes the answer with transparency: *"I couldn't answer your exact question directly, but here's the closest available analysis."* This is the industry standard approach used by SAP Analytics Cloud match to the nearest available report rather than silently fail.
 
-### 3. GraphRAG with Few-Shot Retrieval
-For novel questions outside the function library, the system embeds the user question, retrieves the top K most similar Cypher examples from a curated 54 query library, builds a minimal schema subset relevant to the question, and sends everything as context to the LLM a structured retrieval pipeline, not a raw prompt.
+### 3. GraphRAG with Few Shot Retrieval
+For novel questions outside the function library, the system embeds the user question, retrieves the top K most similar Cypher examples from a curated 60 query library, builds a minimal schema subset relevant to the question, and sends everything as context to the LLM a structured retrieval pipeline, not a raw prompt.
 
 ### 4. Context Aware Error Handling
 When queries return zero results, the system provides targeted feedback instead of generic "try rephrasing" messages:
@@ -28,14 +30,14 @@ When queries return zero results, the system provides targeted feedback instead 
 ### 5. Contract Verification
 Pre built function results are verified against a data contract: required fields, numeric ranges, sort monotonicity, ratio consistency. Critically, the system distinguishes between pre built function results (contract verified) and dynamic Cypher results (contract skipped, since ad hoc Cypher produces field names that never match static schemas). On failure, a best-results fallback restores the strongest earlier attempt instead of returning nothing.
 
-### 6. Schema and Meta-System Intelligence
+### 6. Schema and Meta System Intelligence
 Conceptual questions about the graph schema ("What edge connects SalesOrder to DeliveryItem?") and meta system questions ("How does your NL system translate a query?") are detected before plan routing and routed to dedicated functions. This prevents false positive plan matches where schema keywords like "SalesOrder" or "relationship" would incorrectly trigger data retrieval plans.
 
 ### 7. Deterministic Answer Templates
-For 17+ known functions, answers are produced with **zero LLM involvement** — eliminating number hallucination entirely. The system uses pre-built markdown templates that directly format query results (e.g., AR aging buckets, DSO days, credit exposure) with correct currency symbols, percentages, and counts. LLM formatting is only used as a fallback for novel queries.
+For 17+ known functions, answers are produced with **zero LLM involvement**  eliminating number hallucination entirely. The system uses pre-built markdown templates that directly format query results (e.g., AR aging buckets, DSO days, credit exposure) with correct currency symbols, percentages, and counts. LLM formatting is only used as a fallback for novel queries.
 
 ### 8. Query Decomposition
-Complex multi-part questions ("Show revenue AND delivery rates AND aging buckets for all customers") are automatically detected and split into 2-4 independent sub-queries. Each sub-query gets its own GraphRAG context, Cypher generation, and execution. Results are tagged and merged before answer formatting. Detection uses heuristics: 3+ conjunctions, multiple question marks, 4+ metric keywords.
+Complex multi part questions ("Show revenue AND delivery rates AND aging buckets for all customers") are automatically detected and split into 2 4 independent sub-queries. Each sub-query gets its own GraphRAG context, Cypher generation, and execution. Results are tagged and merged before answer formatting. Detection uses heuristics: 3+ conjunctions, multiple question marks, 4+ metric keywords.
 
 ### 9. Escalating Retry Strategy
 When Cypher generation fails, each retry uses a **fundamentally different approach** instead of repeating the same context:
@@ -54,9 +56,9 @@ Before executing LLM-generated Cypher, the system validates it against the known
 Redis backed conversation history (last 10 messages) + entity memory resolve pronouns across turns: *"Show me the order"* resolves to the exact ID discussed moments ago. Semantic cache (cosine similarity > 0.85) skips the full pipeline for repeated or similar questions.
 
 ### 12. Multi Layer Security
-Input sanitization strips Cypher injection attempts (`CREATE`, `DELETE`, `DROP`, `MERGE`). Rate limiting caps requests at 20/minute per IP. The guardrail node rejects off topic queries before any database access. Entity extraction uses regex, not LLM, to prevent prompt injection through entity names.
+Input sanitization strips Cypher injection attempts (`CREATE`, `DELETE`, `DROP`, `MERGE`). Rate limiting caps requests at 10/minute per IP. The guardrail node rejects off topic queries before any database access. Entity extraction uses regex, not LLM, to prevent prompt injection through entity names.
 
-### 9. Resilient Data Ingestion
+### 13. Resilient Data Ingestion
 The ingestion script processes 19 SAP collections in two passes (nodes first, relationships second) with configurable batch sizes. A resume script handles single record transactions with auto pause on connection errors, ensuring 16,000+ records complete even on constrained infrastructure.
 
 ---
@@ -78,13 +80,13 @@ Dodge_Ai_Task/
 │   ├── package.json          # Dependencies and scripts
 │   ├── tsconfig.json         # TypeScript configuration
 │   ├── config/
-│   │   └── question_plans.json    # 54 semantic routing plans
+│   │   └── question_plans.json    # 61 semantic routing plans
 │   ├── scripts/
 │   │   ├── ingest.ts         # Data ingestion script (JSONL → Neo4j)
 │   │   └── resume-ingest.ts  # Resilient ingestion for large datasets
 │   ├── services/
-│   │   ├── llm.ts            # 3-tier LLM client (Groq/DeepSeek/Gemini)
-│   │   ├── embedding.ts      # Semantic embeddings (all-MiniLM-L6-v2 + TF-IDF fallback)
+│   │   ├── llm.ts            # 3-tier LLM client (Groq/DeepSeek with mutual fallback)
+│   │   ├── embedding.ts      # Domain-tuned TF-IDF embeddings (90+ dim SAP O2C vocabulary)
 │   │   ├── graphRAG.ts       # Few-shot retrieval + schema selection
 │   │   ├── questionPlans.ts  # Semantic plan matcher
 │   │   ├── contractVerifier.ts # Output validation
@@ -94,14 +96,14 @@ Dodge_Ai_Task/
 │   │   ├── metrics.ts        # Latency, cost, usage metrics
 │   │   └── logger.ts         # Observability logging
 │   ├── functions/
-│   │   ├── index.ts          # 72 Cypher functions across 6 intents
+│   │   ├── index.ts          # 72 Cypher functions across 5 intents
 │   │   ├── lookup.ts         # Entity lookups (Customer, Order, Product, etc.)
 │   │   ├── traverse.ts       # Document tracing across O2C chain
 │   │   ├── aggregate.ts      # Revenue, ranking, distribution analytics
 │   │   ├── detect.ts         # Anomaly detection (broken flows, unpaid invoices)
 │   │   ├── compare.ts        # Head-to-head customer comparisons
 │   │   ├── meta.ts           # Schema introspection, pipeline description
-│   │   └── analytics.ts     # 18 pre-built analytics (DSO, aging, credit, etc.)
+│   │   └── analytics.ts     # Pre-built analytics (DSO, aging, credit, etc.)
 │   ├── graph/
 │   │   ├── state.ts          # LangGraph pipeline state interface
 │   │   ├── index.ts          # Pipeline orchestrator with smart retry + decomposition
@@ -131,10 +133,11 @@ Dodge_Ai_Task/
 │       ├── App.tsx           # Main app with routing
 │       ├── index.css         # Dark glassmorphism theme
 │       ├── components/
-│       │   ├── GraphView.tsx     # Force-directed graph visualization
-│       │   ├── ChatPanel.tsx     # Chat interface
-│       │   ├── NodeInspector.tsx # Node detail panel
-│       │   └── AdminPanel.tsx    # Metrics dashboard
+│       │   ├── GraphView.tsx        # Force-directed graph visualization
+│       │   ├── ChatPanel.tsx        # Chat interface
+│       │   ├── FormattedMessage.tsx  # Markdown-formatted message renderer
+│       │   ├── NodeInspector.tsx    # Node detail panel
+│       │   └── AdminPanel.tsx       # Metrics dashboard
 │       └── hooks/
 │           ├── useGraph.ts       # Graph data fetching
 │           └── useChat.ts        # Chat state management
@@ -182,7 +185,7 @@ Dodge_Ai_Task/
 [Neo4j Aura] [Redis]  [Groq LLM] [DeepSeek]
  Graph DB    Cache     Tier 1      Tier 2/3
  19 collections       LLaMA 3     Chat/Reasoner
- 21 node types
+ 19 node types
  18 relationship types
 ```
 
@@ -197,7 +200,7 @@ Each query passes through 6 sequential nodes. This is an industry aligned pipeli
 | Context Resolution | Resolves pronouns using conversation history and entity memory | "Show me the order" becomes "Show me order 740556" based on what was discussed |
 | Guardrail + Intent + Complexity | Single merged node: keyword rules first (0 LLM), then one LLM call returns relevance, intent, complexity, and tier. Detects schema/conceptual questions and routes them to dedicated functions before plan matching. | One call replaces three old nodes. 80% of queries resolved by keywords at 0ms. Schema questions bypass plan routing entirely to avoid false positives. |
 | Entity Extraction | Regex extracts IDs, names, dates from the question. Entities are automatically injected into function params via entity-to-param mapping. | Avoids LLM call for structured extraction. Regex is faster, cheaper, deterministic. Entity injection ensures functions like getOrdersPlacedByCustomer(customerId) receive the extracted ID. |
-| Plan Router + Function Selector | Plan similarity (54 plans, hard lock for critical + soft recommendation at 0.72 threshold), then entity-specific shortcuts, then LLM fallback | Three-tier routing ensures the right function is selected. Threshold raised from 0.55 to 0.72 to eliminate false-positive plan matches. |
+| Plan Router + Function Selector | Plan similarity (61 plans, hard lock for critical + soft recommendation at 0.72 threshold), then entity-specific shortcuts, then LLM fallback | Three-tier routing ensures the right function is selected. Threshold at 0.72 to eliminate false-positive plan matches. |
 | Hybrid Executor | Runs hardcoded function OR generates Cypher dynamically with GraphRAG context. Escalating retries: Tier 2 → Tier 2+CoT → Tier 3 → Query decomposition. Schema-aware validation catches wrong labels/relationships before execution. | If function exists: guaranteed correct. If not: LLM generates Cypher with few-shot examples, targeted schema, and explicit type conversion rules. Each retry escalates strategy instead of repeating. |
 | Answer Formatter | Deterministic templates for 17+ known functions (zero LLM, zero hallucination). LLM formatting only for novel queries with result sanitization and post-LLM validation. | Template path: exact numbers, correct currency/count formatting. LLM path: contract verification, field-type guards, result deduplication. |
 
@@ -215,10 +218,10 @@ If the executor fails (bad Cypher, empty results), it does not just error out or
 
 ## Question Plan System
 
-54 question plans define the system's analytical capabilities. Each plan has:
+61 question plans define the system's analytical capabilities. Each plan has:
 
-- Semantic routing examples (5-7 per plan) matched using **all-MiniLM-L6-v2** sentence transformer embeddings (384-dim, with TF-IDF fallback)
-- A target function name for deterministic execution (all 54 plans now have real functions — zero null-function plans)
+- Semantic routing examples (3-7 per plan) matched using **domain-tuned TF-IDF embeddings** (90+ dimension SAP O2C vocabulary with synonym normalization and phrase boosting)
+- A target function name for deterministic execution (all 61 plans now have real functions — zero null-function plans)
 - A data contract for output verification
 - A criticality flag that locks the plan when matched (no LLM override)
 - Entity-to-param auto injection (extracted IDs are automatically merged into function params)
@@ -233,10 +236,10 @@ For truly novel questions (no plan match, no keyword match), the system falls th
 
 | Tier | Primary | Fallback | When Used |
 |------|---------|----------|-----------|
-| 1 | Groq LLaMA 3.3 70B | Gemini 1.5 Flash | Guardrail, intent classification |
-| 2 | DeepSeek Chat | Gemini 1.5 Flash | Function selection, Cypher generation, answer formatting |
-| 3 | DeepSeek Reasoner | Gemini 1.5 Flash | Complex multi-hop queries (DETECT, COMPARE) |
-| Embed | all-MiniLM-L6-v2 (local ONNX) | TF-IDF fallback | Plan routing, GraphRAG retrieval, semantic cache | Free, ~23MB model |
+| 1 | Groq LLaMA 3.3 70B | DeepSeek Chat | Guardrail, intent classification |
+| 2 | DeepSeek Chat | Groq LLaMA 3.3 70B | Function selection, Cypher generation, answer formatting |
+| 3 | DeepSeek Reasoner | Groq LLaMA 3.3 70B | Complex multi-hop queries (DETECT, COMPARE) |
+| Embed | Domain-tuned TF-IDF | N/A (deterministic) | Plan routing, GraphRAG retrieval, semantic cache | Zero API cost, no native dependencies |
 
 DeepSeek Reasoner produces a chain of thought block before answering, improving accuracy on complex queries by reasoning through relationship directions and join keys before generating Cypher. The think block is stripped before JSON parsing.
 
@@ -357,7 +360,7 @@ ProductPlant -[:IN_PLANT]-> Plant
 ProductStorageLocation -[:FOR_PRODUCT]-> Product
 ```
 
-### Node Types (21)
+### Node Types (19)
 **Core Entities:** Customer, SalesOrder, SalesOrderItem, ScheduleLine, Product, DeliveryHeader, DeliveryItem, BillingHeader, BillingItem, BillingCancellation, JournalEntry, Payment, Plant
 
 **Supporting Entities:** Address, CustomerCompany, CustomerSalesArea, ProductPlant, ProductStorageLocation, ProductDescription
@@ -490,8 +493,8 @@ docker-compose up --build
 | Pipeline | LangGraph (custom 6-node optimized pipeline) | Deterministic state machine with typed state, query decomposition, escalating retries |
 | Graph DB | Neo4j Aura (cloud, free tier) | Native graph traversals for O2C chain analysis |
 | Cache/Memory | Redis Cloud (free tier) | Sub-millisecond reads, TTL expiry, semantic cache |
-| LLM Providers | Groq + DeepSeek + Gemini (all free tier) | Zero-cost with automatic fallback chain |
-| Embeddings | all-MiniLM-L6-v2 (local ONNX, ~23MB) + TF-IDF fallback | Real semantic understanding, zero API cost, cached locally |
+| LLM Providers | Groq + DeepSeek (all free tier) | Zero-cost with mutual Groq↔DeepSeek fallback chain |
+| Embeddings | Domain-tuned TF-IDF (90+ dim SAP O2C vocabulary) | Synonym normalization, phrase boosting, zero API cost, no native dependencies |
 | Containerization | Docker + Docker Compose | Multi-stage builds, health checks, service orchestration |
 ---
 
