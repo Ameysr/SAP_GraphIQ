@@ -1,5 +1,5 @@
 {
-  "minSimilarity": 0.65,
+  "minSimilarity": 0.85,
   "topK": 3,
   "plans": [
     {
@@ -1290,6 +1290,179 @@
           "paymentAmount"
         ],
         "checks": []
+      }
+    },
+    {
+      "id": "plan-so-line-item-stats",
+      "critical": true,
+      "functionName": "getSoLineItemStats",
+      "routingExamples": [
+        "How many total SO line items exist across all orders?",
+        "What is the average number of items per sales order?",
+        "What is the minimum and maximum items per order?",
+        "How many sales order items are there in total?",
+        "Show sales order line item statistics",
+        "Total line items across all sales orders with avg min max"
+      ],
+      "contract": {
+        "requiredFields": [
+          "totalLineItems",
+          "totalOrders",
+          "avgItemsPerOrder"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-all-customers-order-counts",
+      "critical": true,
+      "functionName": "getAllCustomersWithOrderCounts",
+      "routingExamples": [
+        "Which customer placed the most sales orders?",
+        "List all customers with their order counts",
+        "Rank customers by number of orders placed",
+        "Who has the highest number of sales orders?",
+        "Show all customers sorted by order count",
+        "Customer order volume ranking"
+      ],
+      "contract": {
+        "requiredFields": [
+          "customerId",
+          "customerName",
+          "orderCount"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-material-groups-analysis",
+      "critical": true,
+      "functionName": "getMaterialGroupsAnalysis",
+      "routingExamples": [
+        "What material groups exist in the dataset?",
+        "How many line items per material group?",
+        "Break down material groups by quantity and net amount",
+        "What are the two material groups and their statistics?",
+        "Show material group analysis with item counts",
+        "Material group breakdown by line items and amount"
+      ],
+      "contract": {
+        "requiredFields": [
+          "materialGroup",
+          "lineItemCount"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-unique-materials-ordered-vs-billed",
+      "critical": true,
+      "functionName": "getUniqueMaterialsOrderedVsBilled",
+      "routingExamples": [
+        "How many unique materials were ordered vs billed?",
+        "Which ordered materials were never billed?",
+        "Compare materials in sales orders vs billing items",
+        "How many products were ordered but never invoiced?",
+        "Materials ordered versus materials that appeared in billing",
+        "Find products that were sold but never billed"
+      ],
+      "contract": {
+        "requiredFields": [
+          "uniqueMaterialsOrdered",
+          "uniqueMaterialsBilled",
+          "materialsNeverBilled"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-delivery-completion-per-customer",
+      "critical": true,
+      "functionName": "getDeliveryCompletionPerCustomer",
+      "routingExamples": [
+        "For each customer, what percentage of orders have been fully delivered?",
+        "Which customers have 0% delivery completion?",
+        "Per-customer delivery rate breakdown",
+        "Customer delivery completion percentage with overallDeliveryStatus C",
+        "Show delivery fulfillment percentage per customer",
+        "Which customers have none of their orders delivered?"
+      ],
+      "contract": {
+        "requiredFields": [
+          "customerId",
+          "customerName",
+          "deliveryCompletionPct"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-top-materials-by-billed-quantity",
+      "critical": true,
+      "functionName": "getTopMaterialsByBilledQuantity",
+      "routingExamples": [
+        "Which material has the highest total billed quantity?",
+        "Top materials by billed quantity across all billing documents",
+        "Rank products by total billed quantity with product names",
+        "Top 3 materials by billing quantity and net amount",
+        "Which products were billed the most by quantity?",
+        "Most billed materials with quantities and amounts"
+      ],
+      "contract": {
+        "requiredFields": [
+          "materialId",
+          "totalBilledQuantity"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-sales-order-most-line-items",
+      "critical": true,
+      "functionName": "getSalesOrderWithMostLineItems",
+      "routingExamples": [
+        "Which sales order has the most line items?",
+        "Which single order has the highest item count?",
+        "Sales order with maximum number of line items",
+        "Find the order with the most SO items and its details",
+        "Largest sales order by number of items ordered",
+        "Which SO has the most items with value and customer?"
+      ],
+      "contract": {
+        "requiredFields": [
+          "salesOrder",
+          "itemCount"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-payment-collection-rate",
+      "critical": true,
+      "functionName": "getPaymentCollectionRate",
+      "routingExamples": [
+        "What is the overall payment collection rate?",
+        "What percentage of billing value has been collected vs outstanding?",
+        "How much has been collected vs how much is still unpaid?",
+        "Payment collection percentage and outstanding amount",
+        "Total billing value collected vs outstanding balance",
+        "Collection rate for active billing documents"
+      ],
+      "contract": {
+        "requiredFields": [
+          "totalActiveBilled",
+          "totalCollected",
+          "outstanding",
+          "collectionPct"
+        ],
+        "checks": [
+          {
+            "type": "range",
+            "field": "collectionPct",
+            "min": 0,
+            "max": 100
+          }
+        ]
       }
     }
   ]

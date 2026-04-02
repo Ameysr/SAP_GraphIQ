@@ -92,6 +92,13 @@ const PHRASE_BOOSTS: Array<{ pattern: RegExp; boosts: Record<string, number> }> 
   { pattern: /debit.*credit|credit.*debit/i, boosts: { debit: 3, credit: 3, journal: 2, entry: 2 } },
   { pattern: /overdue\s*deliver/i, boosts: { overdue: 3, delivery: 3, late: 2, schedule: 2 } },
   { pattern: /customer\s*recency|churn/i, boosts: { recency: 3, customer: 3, order: 2, risk: 2 } },
+  { pattern: /material\s*group/i, boosts: { material: 4, group: 4, item: 2, line: 2 } },
+  { pattern: /ordered?\s*(?:vs?|versus|compared?\s*to)\s*billed/i, boosts: { material: 3, unique: 3, billed: 3, never: 2 } },
+  { pattern: /line\s*items?\s*(?:per|across|stat)/i, boosts: { item: 3, line: 3, order: 2, count: 2 } },
+  { pattern: /delivery\s*(?:completion|%|percent|rate)\s*(?:per|by|each)\s*customer/i, boosts: { delivery: 3, customer: 4, rate: 3, percentage: 3 } },
+  { pattern: /(?:per|each|every)\s*customer.*deliver/i, boosts: { customer: 4, delivery: 3, percentage: 3, rate: 2 } },
+  { pattern: /(?:billed|billing)\s*quantit/i, boosts: { billing: 3, material: 3, product: 2, item: 2 } },
+  { pattern: /(?:most|maximum|highest)\s*(?:line\s*)?items/i, boosts: { item: 4, line: 3, order: 3, count: 2 } },
 ];
 
 function tokenize(text: string): string[] {

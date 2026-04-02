@@ -61,6 +61,14 @@ const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResul
   getActiveBillingTotals: () => aggregate.getActiveBillingTotals(),
   getTopActiveBillingMonthRevenue: () => aggregate.getTopActiveBillingMonthRevenue(),
   getTopDeliveriesByProductCount: (p: unknown) => aggregate.getTopDeliveriesByProductCount(Number((p as Record<string, string>).limit) || 10),
+  getSoLineItemStats: () => aggregate.getSoLineItemStats(),
+  getAllCustomersWithOrderCounts: (p: unknown) => aggregate.getAllCustomersWithOrderCounts(Number((p as Record<string, string>).limit) || 50),
+  getMaterialGroupsAnalysis: () => aggregate.getMaterialGroupsAnalysis(),
+  getUniqueMaterialsOrderedVsBilled: () => aggregate.getUniqueMaterialsOrderedVsBilled(),
+  getDeliveryCompletionPerCustomer: () => aggregate.getDeliveryCompletionPerCustomer(),
+  getTopMaterialsByBilledQuantity: (p: unknown) => aggregate.getTopMaterialsByBilledQuantity(Number((p as Record<string, string>).limit) || 10),
+  getSalesOrderWithMostLineItems: () => aggregate.getSalesOrderWithMostLineItems(),
+  getPaymentCollectionRate: () => aggregate.getPaymentCollectionRate(),
   findBrokenFlows: (p: unknown) => detect.findBrokenFlows((p as Record<string, string>).type ?? 'undelivered'),
   getUnpaidInvoices: (p: unknown) => detect.getUnpaidInvoices(Number((p as Record<string, string>).limit) || 10),
   getCancelledDocs: (p: unknown) => detect.getCancelledDocs(Number((p as Record<string, string>).limit) || 10),
@@ -121,13 +129,95 @@ const VALID_RELATIONSHIPS = new Set([
   'HAS_DESCRIPTION', 'FOR_PRODUCT',
 ]);
 
+// ── FULL RELATIONSHIP REFERENCE (injected into every Cypher generation prompt) ─
+const RELATIONSHIP_REFERENCE = `
+VALID RELATIONSHIPS — use ONLY these (DO NOT invent new ones):
+(Customer)-[:PLACED]->(SalesOrder)
+(SalesOrder)-[:HAS_ITEM]->(SalesOrderItem)
+(SalesOrderItem)-[:HAS_SCHEDULE_LINE]->(ScheduleLine)
+(SalesOrderItem)-[:REFERENCES]->(Product)
+(SalesOrderItem)-[:FULFILLED_BY]->(DeliveryItem)
+(DeliveryItem)-[:PART_OF]->(DeliveryHeader)
+(DeliveryItem)-[:AT_PLANT]->(Plant)
+(DeliveryHeader)-[:BILLED_IN]->(BillingItem)
+(BillingItem)-[:PART_OF]->(BillingHeader)
+(BillingHeader)-[:POSTED_AS]->(JournalEntry)
+(BillingHeader)-[:PAID_BY]->(Payment)
+(BillingCancellation)-[:CANCELS]->(BillingHeader)
+(Product)-[:STOCKED_AT]->(ProductPlant)
+(ProductPlant)-[:IN_PLANT]->(Plant)
+(Customer)-[:HAS_ADDRESS]->(Address)
+(Customer)-[:ASSIGNED_TO_COMPANY]->(CustomerCompany)
+(Customer)-[:SELLS_THROUGH]->(CustomerSalesArea)
+(Product)-[:HAS_DESCRIPTION]->(ProductDescription)
+
+COMMON MISTAKES TO AVOID:
+- There is NO [:HAS] relationship — use [:HAS_ITEM] for SalesOrder→SalesOrderItem
+- There is NO [:DELIVERS] or [:DELIVERED_BY] — use [:FULFILLED_BY] for SalesOrderItem→DeliveryItem
+- There is NO [:BELONGS_TO] — use [:PART_OF] for Item→Header
+- There is NO [:BILLED] or [:INVOICED] — use [:BILLED_IN] for DeliveryHeader→BillingItem
+- There is NO [:PAYS] — use [:PAID_BY] for BillingHeader→Payment
+- There is NO [:ORDERED_BY] — use [:PLACED] for Customer→SalesOrder
+- BillingItem has NO relationship to Product — use bi.material string property directly
+`.trim();
+
+// ── CYPHER AUTO-REPAIR ────────────────────────────────────────────────────────
+// Fixes common LLM mistakes before schema validation, avoiding wasted retries.
+const RELATIONSHIP_REPAIRS: Record<string, string> = {
+  'HAS': 'HAS_ITEM',
+  'CONTAINS': 'HAS_ITEM',
+  'HAS_ITEMS': 'HAS_ITEM',
+  'DELIVERS': 'FULFILLED_BY',
+  'DELIVERED_BY': 'FULFILLED_BY',
+  'FULFILLS': 'FULFILLED_BY',
+  'BELONGS_TO': 'PART_OF',
+  'MEMBER_OF': 'PART_OF',
+  'IN': 'PART_OF',
+  'BILLED': 'BILLED_IN',
+  'INVOICED': 'BILLED_IN',
+  'INVOICED_IN': 'BILLED_IN',
+  'PAYS': 'PAID_BY',
+  'PAYMENT': 'PAID_BY',
+  'ORDERED_BY': 'PLACED',
+  'ORDERS': 'PLACED',
+  'POSTED': 'POSTED_AS',
+  'JOURNAL': 'POSTED_AS',
+  'STOCKED': 'STOCKED_AT',
+  'AT': 'AT_PLANT',
+  'CANCELLED': 'CANCELS',
+  'CANCELLED_BY': 'CANCELS',
+  'REFERS_TO': 'REFERENCES',
+  'FOR': 'REFERENCES',
+};
+
+function autoRepairCypher(cypher: string): { repaired: string; fixes: string[] } {
+  const fixes: string[] = [];
+  let repaired = cypher;
+
+  // Fix relationship types
+  const relPattern = /\[(\w*):([A-Z_]+)\]/g;
+  repaired = repaired.replace(relPattern, (match, alias, relType) => {
+    const fix = RELATIONSHIP_REPAIRS[relType];
+    if (fix) {
+      fixes.push(`[:${relType}] → [:${fix}]`);
+      return `[${alias}:${fix}]`;
+    }
+    return match;
+  });
+
+  return { repaired, fixes };
+}
+
 function validateCypherSchema(cypher: string): string[] {
   const warnings: string[] = [];
 
-  // Check node labels — extract :LabelName patterns
-  const labelMatches = cypher.match(/:\s*([A-Z][a-zA-Z]+)/g) || [];
+  // Check node labels — extract (:LabelName) patterns (inside parentheses only)
+  // This avoids false-matching relationship types like [:PLACED] or [:PART_OF]
+  const labelMatches = cypher.match(/\(\s*\w*\s*:\s*([A-Z][a-zA-Z]+)/g) || [];
   for (const match of labelMatches) {
-    const label = match.replace(/^:\s*/, '');
+    const labelMatch = match.match(/:\s*([A-Z][a-zA-Z]+)/);
+    const label = labelMatch?.[1];
+    if (!label) continue;
     // Skip Neo4j built-in labels and type casts
     if (['DISTINCT', 'NOT', 'NULL', 'WHERE', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'DESC', 'ASC', 'WITH', 'MATCH', 'RETURN', 'ORDER'].includes(label)) continue;
     if (!VALID_NODE_LABELS.has(label)) {
@@ -333,7 +423,9 @@ SIMILAR EXAMPLE QUERIES (adapt these patterns to the user's question):
 ${ragContext.fewShotExamples}
 
 RELEVANT SCHEMA (ONLY use these node types and relationships):
-${ragContext.schemaSubset}`;
+${ragContext.schemaSubset}
+
+${RELATIONSHIP_REFERENCE}`;
 
   // ── CHAIN-OF-THOUGHT — always on for retries, constrained queries ──
   if (isConstrained || isRetry) {
@@ -447,6 +539,13 @@ Extracted entities: ${JSON.stringify(state.extractedEntities)}`;
         answer: "I wasn't able to generate a safe query for this question. Please try rephrasing.",
         confidence: 'low',
       };
+    }
+
+    // ── AUTO-REPAIR common LLM mistakes ──
+    const { repaired, fixes } = autoRepairCypher(result.cypher);
+    if (fixes.length > 0) {
+      console.log(`  [AutoRepair] Fixed ${fixes.length} relationship(s): ${fixes.join(', ')}`);
+      result.cypher = repaired;
     }
 
     // ── SCHEMA-AWARE VALIDATION ──

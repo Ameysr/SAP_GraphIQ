@@ -744,4 +744,102 @@ ORDER BY dh.creationDate DESC
 LIMIT 50`,
     schemaNodes: ['DeliveryHeader', 'DeliveryItem', 'SalesOrderItem', 'SalesOrder', 'Customer'],
   },
+
+  // ────── AGGREGATION PATTERNS (teach LLM common Cypher aggregation patterns) ──────
+  {
+    question: 'List all customers ranked by number of orders placed',
+    cypher: `MATCH (c:Customer)-[:PLACED]->(so:SalesOrder)
+RETURN c.id AS customerId, c.businessPartnerFullName AS customerName, count(so) AS orderCount
+ORDER BY orderCount DESC
+LIMIT 50`,
+    schemaNodes: ['Customer', 'SalesOrder'],
+  },
+  {
+    question: 'What is the total billed quantity and net amount per material across all billing items?',
+    cypher: `MATCH (bi:BillingItem)-[:PART_OF]->(bh:BillingHeader)
+WHERE bh.billingDocumentIsCancelled = false AND bi.material IS NOT NULL
+WITH bi.material AS materialId,
+     sum(toFloat(bi.billingQuantity)) AS totalQty,
+     sum(toFloat(bi.netAmount)) AS totalNetAmount
+OPTIONAL MATCH (p:Product {id: materialId})
+RETURN materialId, coalesce(p.productDescription, 'N/A') AS productName,
+       round(totalQty * 100) / 100.0 AS totalBilledQuantity,
+       round(totalNetAmount * 100) / 100.0 AS totalBilledNetAmount
+ORDER BY totalQty DESC
+LIMIT 20`,
+    schemaNodes: ['BillingItem', 'BillingHeader', 'Product'],
+  },
+  {
+    question: 'For each customer, what percentage of their orders have been fully delivered?',
+    cypher: `MATCH (c:Customer)-[:PLACED]->(so:SalesOrder)
+WITH c.id AS customerId, c.businessPartnerFullName AS customerName,
+     count(so) AS totalOrders,
+     sum(CASE WHEN so.overallDeliveryStatus = 'C' THEN 1 ELSE 0 END) AS fullyDelivered
+RETURN customerId, customerName, totalOrders, fullyDelivered,
+       CASE WHEN totalOrders = 0 THEN 0
+            ELSE round(toFloat(fullyDelivered) / toFloat(totalOrders) * 10000) / 100.0
+       END AS deliveryPct
+ORDER BY deliveryPct ASC`,
+    schemaNodes: ['Customer', 'SalesOrder'],
+  },
+  {
+    question: 'Which sales order has the most line items?',
+    cypher: `MATCH (so:SalesOrder)-[:HAS_ITEM]->(soi:SalesOrderItem)
+WITH so, count(soi) AS itemCount, sum(toFloat(soi.netAmount)) AS totalValue
+ORDER BY itemCount DESC
+LIMIT 1
+OPTIONAL MATCH (c:Customer {id: so.soldToParty})
+RETURN so.salesOrder AS salesOrder, itemCount,
+       round(totalValue * 100) / 100.0 AS totalValue,
+       so.overallDeliveryStatus AS deliveryStatus,
+       c.businessPartnerFullName AS customerName`,
+    schemaNodes: ['SalesOrder', 'SalesOrderItem', 'Customer'],
+  },
+  {
+    question: 'Total sales order line items with average, minimum, and maximum items per order',
+    cypher: `MATCH (so:SalesOrder)-[:HAS_ITEM]->(soi:SalesOrderItem)
+WITH so, count(soi) AS itemsPerOrder
+RETURN sum(itemsPerOrder) AS totalLineItems, count(so) AS totalOrders,
+       round(avg(itemsPerOrder) * 100) / 100.0 AS avgItemsPerOrder,
+       min(itemsPerOrder) AS minItemsPerOrder, max(itemsPerOrder) AS maxItemsPerOrder`,
+    schemaNodes: ['SalesOrder', 'SalesOrderItem'],
+  },
+  {
+    question: 'Break down material groups by line item count and net amount',
+    cypher: `MATCH (soi:SalesOrderItem)
+WHERE soi.materialGroup IS NOT NULL
+RETURN soi.materialGroup AS materialGroup, count(soi) AS lineItemCount,
+       round(sum(toFloat(soi.requestedQuantity)) * 100) / 100.0 AS totalQuantity,
+       round(sum(toFloat(soi.netAmount)) * 100) / 100.0 AS totalNetAmount
+ORDER BY lineItemCount DESC`,
+    schemaNodes: ['SalesOrderItem'],
+  },
+  {
+    question: 'Compare unique materials ordered vs billed and find never-billed materials',
+    cypher: `MATCH (soi:SalesOrderItem)-[:REFERENCES]->(p:Product)
+WITH collect(DISTINCT p.id) AS orderedMaterials
+MATCH (bi:BillingItem) WHERE bi.material IS NOT NULL
+WITH orderedMaterials, collect(DISTINCT bi.material) AS billedMaterials
+WITH orderedMaterials, billedMaterials,
+     [m IN orderedMaterials WHERE NOT m IN billedMaterials] AS neverBilled
+RETURN size(orderedMaterials) AS uniqueOrdered, size(billedMaterials) AS uniqueBilled,
+       size(neverBilled) AS materialsNeverBilled, neverBilled[..20] AS neverBilledSample`,
+    schemaNodes: ['SalesOrderItem', 'Product', 'BillingItem'],
+  },
+  {
+    question: 'Total payment collected vs total active billing amount with collection percentage',
+    cypher: `MATCH (bh:BillingHeader)
+WHERE bh.billingDocumentIsCancelled = false
+WITH sum(toFloat(bh.totalNetAmount)) AS totalBilled,
+     head(collect(DISTINCT bh.transactionCurrency)) AS currency
+OPTIONAL MATCH (bh2:BillingHeader)-[:PAID_BY]->(p:Payment)
+WHERE bh2.billingDocumentIsCancelled = false
+WITH totalBilled, currency, sum(toFloat(p.amountInTransactionCurrency)) AS totalPaid
+RETURN round(totalBilled * 100) / 100.0 AS totalActiveBilled,
+       round(totalPaid * 100) / 100.0 AS totalCollected,
+       round((totalBilled - totalPaid) * 100) / 100.0 AS outstanding,
+       round(totalPaid / totalBilled * 10000) / 100.0 AS collectionPct,
+       currency`,
+    schemaNodes: ['BillingHeader', 'Payment'],
+  },
 ];

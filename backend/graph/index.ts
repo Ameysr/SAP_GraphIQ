@@ -157,11 +157,11 @@ export async function runPipeline(
     }));
 
     const shouldLockCriticalPlan =
-      !!topCandidate?.plan.critical && topCandidate.similarity >= (minSimilarity ?? 0.65);
+      !!topCandidate?.plan.critical && topCandidate.similarity >= (minSimilarity ?? 0.85);
 
-    // Soft recommendation threshold: raised from 0.55 to 0.72 to prevent false positive
-    // plan matches (e.g., anomaly-report matching a conceptual question at 0.603).
-    const SOFT_RECOMMENDATION_THRESHOLD = 0.72;
+    // Soft recommendation threshold: raised to 0.80 to prevent false positive
+    // plan matches. Below 0.80, let the improved Cypher fallback handle it.
+    const SOFT_RECOMMENDATION_THRESHOLD = 0.80;
     const shouldSoftRecommend =
       !shouldLockCriticalPlan &&
       topCandidate &&

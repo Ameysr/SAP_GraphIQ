@@ -103,6 +103,56 @@ const DETERMINISTIC_TEMPLATES: Record<string, (results: Record<string, unknown>[
     });
     return `**Delivery Status Breakdown**\n\n${lines.join('\n')}`;
   },
+  getSoLineItemStats: (results) => {
+    const r = results[0] ?? {};
+    return `**Sales Order Line Item Statistics**\n\n- **Total line items**: ${r.totalLineItems}\n- **Total orders**: ${r.totalOrders}\n- **Average items per order**: ${r.avgItemsPerOrder}\n- **Minimum items per order**: ${r.minItemsPerOrder}\n- **Maximum items per order**: ${r.maxItemsPerOrder}`;
+  },
+  getAllCustomersWithOrderCounts: (results) => {
+    const lines = results.map((r, i) => {
+      return `${i + 1}. **${r.customerName}** (${r.customerId}): **${r.orderCount}** orders`;
+    });
+    return `**Customer Order Volume Ranking** (${results.length} customers)\n\n${lines.join('\n')}`;
+  },
+  getMaterialGroupsAnalysis: (results) => {
+    const lines = results.map((r) => {
+      return `- **${r.materialGroup}**: ${r.lineItemCount} line items, ${r.totalQuantity} total quantity, INR ${Number(r.totalNetAmount).toLocaleString()} net amount`;
+    });
+    return `**Material Group Breakdown** (${results.length} groups)\n\n${lines.join('\n')}`;
+  },
+  getUniqueMaterialsOrderedVsBilled: (results) => {
+    const r = results[0] ?? {};
+    const neverBilled = Array.isArray(r.neverBilledSample) ? r.neverBilledSample.slice(0, 10).join(', ') : '';
+    return `**Materials Ordered vs Billed**\n\n- **Unique materials ordered**: ${r.uniqueMaterialsOrdered}\n- **Unique materials billed**: ${r.uniqueMaterialsBilled}\n- **Materials never billed**: ${r.materialsNeverBilled}\n\n${neverBilled ? `Sample never-billed material IDs: ${neverBilled}` : ''}`;
+  },
+  getDeliveryCompletionPerCustomer: (results) => {
+    const zeroDelivery = results.filter((r) => Number(r.deliveryCompletionPct) === 0);
+    const lines = results.map((r) => {
+      const valueStr = Number(r.undeliveredOrderValue) > 0 ? ` | Undelivered value: ${r.currency} ${Number(r.undeliveredOrderValue).toLocaleString()}` : '';
+      return `- **${r.customerName}** (${r.customerId}): ${r.fullyDelivered}/${r.totalOrders} orders delivered — **${r.deliveryCompletionPct}%**${valueStr}`;
+    });
+    let answer = `**Delivery Completion Rate Per Customer** (${results.length} customers)\n\n${lines.join('\n')}`;
+    if (zeroDelivery.length > 0) {
+      const names = zeroDelivery.map((r) => `**${r.customerName}** (${r.currency} ${Number(r.undeliveredOrderValue).toLocaleString()})`).join(', ');
+      const totalUndelivered = zeroDelivery.reduce((sum, r) => sum + Number(r.undeliveredOrderValue), 0);
+      const currency = zeroDelivery[0]?.currency ?? 'INR';
+      answer += `\n\n⚠️ **Customers with 0% delivery completion**: ${names}\n- **Total undelivered order value**: ${currency} ${totalUndelivered.toLocaleString()}`;
+    }
+    return answer;
+  },
+  getTopMaterialsByBilledQuantity: (results) => {
+    const lines = results.map((r, i) => {
+      return `${i + 1}. **${r.productName}** (${r.materialId}): qty **${r.totalBilledQuantity}**, ${r.currency} ${Number(r.totalBilledNetAmount).toLocaleString()} net`;
+    });
+    return `**Top Materials by Billed Quantity** (${results.length} shown)\n\n${lines.join('\n')}`;
+  },
+  getSalesOrderWithMostLineItems: (results) => {
+    const r = results[0] ?? {};
+    return `**Sales Order with Most Line Items**\n\n- **Order ID**: ${r.salesOrder}\n- **Item count**: ${r.itemCount}\n- **Total value**: ${r.currency} ${Number(r.totalValue).toLocaleString()}\n- **Delivery status**: ${r.deliveryStatus === 'C' ? 'Fully Delivered (C)' : r.deliveryStatus === 'A' ? 'Not Delivered (A)' : r.deliveryStatus}\n- **Customer**: ${r.customerName} (${r.customerId})`;
+  },
+  getPaymentCollectionRate: (results) => {
+    const r = results[0] ?? {};
+    return `**Payment Collection Rate**\n\n- **Total active billing value**: ${r.currency} ${Number(r.totalActiveBilled).toLocaleString()}\n- **Total collected (paid invoices)**: ${r.currency} ${Number(r.totalCollected).toLocaleString()}\n- **Outstanding**: ${r.currency} ${Number(r.outstanding).toLocaleString()}\n- **Collection rate**: **${r.collectionPct}%**`;
+  },
 };
 
 // ── RESULT SANITIZATION ────────────────────────────────────────────────────────
