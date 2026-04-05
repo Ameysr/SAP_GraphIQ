@@ -1464,6 +1464,91 @@
           }
         ]
       }
+    },
+    {
+      "id": "plan-shipping-point-breakdown",
+      "critical": true,
+      "functionName": "getShippingPointBreakdown",
+      "routingExamples": [
+        "How many unique shipping points are used across all deliveries? List each shipping point and how many deliveries it handled.",
+        "Which shipping points are used and how many deliveries does each one process?",
+        "Breakdown of delivery documents by shipping point",
+        "List all shipping points with delivery counts",
+        "How many deliveries were processed by each shipping point?",
+        "Shipping point analysis across all outbound deliveries"
+      ],
+      "contract": {
+        "requiredFields": [
+          "shippingPoint",
+          "deliveryCount"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-materials-never-delivered",
+      "critical": true,
+      "functionName": "getMaterialsNeverDelivered",
+      "routingExamples": [
+        "How many materials were ordered but never appeared in any delivery? How many were delivered?",
+        "Which materials were ordered but never shipped or delivered?",
+        "Materials ordered but not fulfilled via delivery",
+        "Count materials never delivered despite being on sales orders",
+        "How many unique materials have no delivery fulfillment?",
+        "Ordered materials with zero delivery records"
+      ],
+      "contract": {
+        "requiredFields": [
+          "totalMaterialsOrdered",
+          "totalMaterialsDelivered",
+          "neverDeliveredCount"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-so-value-by-channel",
+      "critical": true,
+      "functionName": "getSalesOrderValueByChannel",
+      "routingExamples": [
+        "For each distribution channel, what is the average, minimum, and maximum sales order value?",
+        "Sales order value statistics broken down by distribution channel",
+        "Per-channel average and min/max order values",
+        "Compare order values across distribution channels: avg, min, max",
+        "What is the average order value for each distribution channel?",
+        "Distribution channel order value analysis with min, max, average"
+      ],
+      "contract": {
+        "requiredFields": [
+          "channel",
+          "avgValue",
+          "minValue",
+          "maxValue"
+        ],
+        "checks": []
+      }
+    },
+    {
+      "id": "plan-billing-docs-by-creation-date",
+      "critical": true,
+      "functionName": "getBillingDocsByCreationDate",
+      "routingExamples": [
+        "How many billing documents were created on each date? For each date show total count, how many are cancelled, and total net amount.",
+        "Group billing documents by their creation date with cancelled and active counts",
+        "Billing document creation timeline: how many created per date?",
+        "Show billing doc count per creation date with cancellation breakdown",
+        "How are billing documents distributed across creation dates?",
+        "Daily billing document volume with active vs cancelled split"
+      ],
+      "contract": {
+        "requiredFields": [
+          "creationDate",
+          "totalDocs",
+          "cancelledDocs",
+          "activeDocs"
+        ],
+        "checks": []
+      }
     }
   ]
 }

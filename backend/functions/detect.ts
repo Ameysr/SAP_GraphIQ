@@ -412,3 +412,27 @@ export async function getUnpaidActiveBillingDocs(): Promise<FunctionResult> {
   const records = await runQuery(cypher, {});
   return wrapResult(records, 'getUnpaidActiveBillingDocs');
 }
+
+// ── getMaterialsNeverDelivered ────────────────────────────────────────────────
+// Compares unique materials ordered (SalesOrderItem) vs actually delivered
+// (SalesOrderItem→FULFILLED_BY→DeliveryItem). Returns materials never delivered.
+// NOTE: distinct from getUniqueMaterialsOrderedVsBilled which checks billing.
+export async function getMaterialsNeverDelivered(): Promise<FunctionResult> {
+  const cypher = `
+    MATCH (soi:SalesOrderItem)
+    WHERE soi.material IS NOT NULL
+    WITH collect(DISTINCT soi.material) AS orderedMaterials
+    MATCH (soi2:SalesOrderItem)-[:FULFILLED_BY]->(:DeliveryItem)
+    WHERE soi2.material IS NOT NULL
+    WITH orderedMaterials, collect(DISTINCT soi2.material) AS deliveredMaterials
+    WITH orderedMaterials, deliveredMaterials,
+         [m IN orderedMaterials WHERE NOT m IN deliveredMaterials] AS neverDelivered
+    RETURN size(orderedMaterials)  AS totalMaterialsOrdered,
+           size(deliveredMaterials) AS totalMaterialsDelivered,
+           size(neverDelivered)     AS neverDeliveredCount,
+           neverDelivered[..15]     AS sampleNeverDelivered
+  `;
+  const records = await runQuery(cypher, {});
+  return wrapResult(records, 'getMaterialsNeverDelivered');
+}
+

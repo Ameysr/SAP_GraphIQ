@@ -13,6 +13,34 @@ const DETERMINISTIC_TEMPLATES: Record<string, (results: Record<string, unknown>[
     const r = results[0] ?? {};
     return `**${r.activeDocs ?? 0}** out of **${r.totalDocs ?? 0}** billing documents are active (non-cancelled), representing **${r.activePercentage ?? 0}%** of all billing docs.\n\nThe combined total net amount from active billing documents is **${r.currency ?? 'INR'} ${r.activeTotalNetAmount != null ? Number(r.activeTotalNetAmount).toLocaleString() : 'N/A'}**.`;
   },
+  getShippingPointBreakdown: (results) => {
+    if (!results.length) return 'No shipping point data found.';
+    const total = results.reduce((s, r) => s + Number(r.deliveryCount ?? 0), 0);
+    const lines = results.map((r, i) =>
+      `${i + 1}. **${r.shippingPoint}**: ${r.deliveryCount} deliveries`
+    );
+    return `**Shipping Points Breakdown** (${results.length} unique shipping point${results.length > 1 ? 's' : ''}, ${total} total deliveries)\n\n${lines.join('\n')}`;
+  },
+  getMaterialsNeverDelivered: (results) => {
+    const r = results[0] ?? {};
+    const sample = Array.isArray(r.sampleNeverDelivered) ? (r.sampleNeverDelivered as string[]).join(', ') : 'N/A';
+    return `**Materials Ordered vs Delivered**\n\n- **Unique materials ordered**: ${r.totalMaterialsOrdered ?? 0}\n- **Unique materials delivered**: ${r.totalMaterialsDelivered ?? 0}\n- **Materials never delivered**: ${r.neverDeliveredCount ?? 0}\n- **Sample never-delivered material IDs**: ${sample}`;
+  },
+  getSalesOrderValueByChannel: (results) => {
+    if (!results.length) return 'No distribution channel data found.';
+    const lines = results.map(r =>
+      `- **Channel ${r.channel}** (${r.orderCount} orders): Avg INR ${Number(r.avgValue).toLocaleString()} | Min INR ${Number(r.minValue).toLocaleString()} | Max INR ${Number(r.maxValue).toLocaleString()} | Total INR ${Number(r.totalValue).toLocaleString()}`
+    );
+    return `**Sales Order Value by Distribution Channel**\n\n${lines.join('\n')}`;
+  },
+  getBillingDocsByCreationDate: (results) => {
+    if (!results.length) return 'No billing document creation date data found.';
+    const lines = results.map(r =>
+      `- **${r.creationDate}**: ${r.totalDocs} total (${r.cancelledDocs} cancelled, ${r.activeDocs} active) | Active net: ${r.currency ?? 'INR'} ${Number(r.activeNetAmount ?? 0).toLocaleString()}`
+    );
+    const grandTotal = results.reduce((s, r) => s + Number(r.totalDocs ?? 0), 0);
+    return `**Billing Documents by Creation Date** (${grandTotal} total across ${results.length} date${results.length > 1 ? 's' : ''})\n\n${lines.join('\n')}`;
+  },
   getTopActiveBillingMonthRevenue: (results) => {
     const r = results[0] ?? {};
     return `The month with the highest active (non-cancelled) billing revenue is **${r.month ?? 'N/A'}** with **${r.currency ?? 'INR'} ${r.activeRevenueAmount != null ? Number(r.activeRevenueAmount).toLocaleString() : 'N/A'}**.\n\nThis represents **${r.activeRevenuePercentage ?? 0}%** of the total active billing revenue of **${r.currency ?? 'INR'} ${r.activeRevenueTotal != null ? Number(r.activeRevenueTotal).toLocaleString() : 'N/A'}**.`;

@@ -59,6 +59,9 @@ const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResul
   },
   getRevenueConcentration: () => aggregate.getRevenueConcentration(),
   getActiveBillingTotals: () => aggregate.getActiveBillingTotals(),
+  getShippingPointBreakdown: () => aggregate.getShippingPointBreakdown(),
+  getSalesOrderValueByChannel: () => aggregate.getSalesOrderValueByChannel(),
+  getBillingDocsByCreationDate: () => aggregate.getBillingDocsByCreationDate(),
   getTopActiveBillingMonthRevenue: () => aggregate.getTopActiveBillingMonthRevenue(),
   getTopDeliveriesByProductCount: (p: unknown) => aggregate.getTopDeliveriesByProductCount(Number((p as Record<string, string>).limit) || 10),
   getSoLineItemStats: () => aggregate.getSoLineItemStats(),
@@ -85,6 +88,7 @@ const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResul
   getBillingDocTypeBreakdown: () => detect.getBillingDocTypeBreakdown(),
   getPlantRevenueRanking: () => detect.getPlantRevenueRanking(),
   getUnpaidActiveBillingDocs: () => detect.getUnpaidActiveBillingDocs(),
+  getMaterialsNeverDelivered: () => detect.getMaterialsNeverDelivered(),
   getSystemPipelineDescription: (p: unknown) => {
     const params = p as Record<string, string>;
     return meta.getSystemPipelineDescription(params.mentionedQuery, params.entities ? JSON.parse(params.entities) : undefined);

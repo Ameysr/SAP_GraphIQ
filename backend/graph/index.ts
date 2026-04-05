@@ -159,9 +159,11 @@ export async function runPipeline(
     const shouldLockCriticalPlan =
       !!topCandidate?.plan.critical && topCandidate.similarity >= (minSimilarity ?? 0.85);
 
-    // Soft recommendation threshold: raised to 0.80 to prevent false positive
-    // plan matches. Below 0.80, let the improved Cypher fallback handle it.
-    const SOFT_RECOMMENDATION_THRESHOLD = 0.80;
+    // Soft recommendation threshold: raised to 0.88 to prevent false positive
+    // plan matches. Scores of 0.81-0.83 were hitting completely wrong functions
+    // (e.g. "shipping points" → getBillingDocTypeBreakdown at 0.832).
+    // Below 0.88, fall through to functionSelector + LLM/dynamic Cypher.
+    const SOFT_RECOMMENDATION_THRESHOLD = 0.88;
     const shouldSoftRecommend =
       !shouldLockCriticalPlan &&
       topCandidate &&

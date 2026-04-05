@@ -6,7 +6,7 @@ import crypto from 'crypto';
 const CACHE_TTL = 86400; // 24 hours
 const SIMILARITY_THRESHOLD = 0.85; // Lowered slightly for domain-vocab vectors
 const SEMCACHE_SCAN_KEYS = parseInt(process.env.SEMCACHE_SCAN_KEYS ?? '200', 10);
-const SEMCACHE_VERSION = process.env.SEMCACHE_VERSION ?? 'v2';
+const SEMCACHE_VERSION = process.env.SEMCACHE_VERSION ?? 'v3';
 const SEMCACHE_INDEX_KEY = `semcache:index:${SEMCACHE_VERSION}`;
 
 function hashKey(text: string): string {

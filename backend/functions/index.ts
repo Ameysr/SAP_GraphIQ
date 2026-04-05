@@ -51,6 +51,9 @@ export const FUNCTION_REGISTRY: Record<IntentType, FunctionDef[]> = {
     { name: 'getPaymentTermsSplit', description: 'Get payment terms (Z001/Z009) split across all sales orders grouped by customer', params: {} },
     { name: 'getBillingDocTypeBreakdown', description: 'Get breakdown of billing documents by type (F2, S1 etc): count, cancelled count, total net amount per type', params: {} },
     { name: 'getPlantRevenueRanking', description: 'Rank all plants by total billed revenue from active (non-cancelled) billing items linked through deliveries', params: {} },
+    { name: 'getShippingPointBreakdown', description: 'Count how many delivery documents each shipping point handled — lists all unique shipping points with delivery counts', params: {} },
+    { name: 'getSalesOrderValueByChannel', description: 'Per distribution channel sales order value statistics: average, minimum, maximum, and total order value per channel', params: {} },
+    { name: 'getBillingDocsByCreationDate', description: 'Group billing documents by creation date: total count, cancelled count, active count, and active net amount per date', params: {} },
     // Analytics (pre-built complex queries)
     { name: 'getO2CHealthSummary', description: 'Full O2C health summary: total orders, deliveries, invoices, billed amount, payments, collected amount', params: {} },
     { name: 'getARAgingBuckets', description: 'AR aging buckets per customer: 0-30, 31-60, 61-90, 90+ days outstanding amounts', params: {} },
@@ -82,6 +85,7 @@ export const FUNCTION_REGISTRY: Record<IntentType, FunctionDef[]> = {
     { name: 'getDeliveryFulfillmentRate', description: 'Get delivery fulfillment rate per customer: total items ordered vs items delivered, with order IDs and quantities', params: {} },
     { name: 'getMostExpensiveBillingItem', description: 'Find the most expensive billing items by net amount, including product info, cancellation status, and customer', params: {} },
     { name: 'getUnpaidActiveBillingDocs', description: 'Get active (non-cancelled) billing documents that have NOT been paid, with count, total outstanding amount, and customer breakdown', params: {} },
+    { name: 'getMaterialsNeverDelivered', description: 'Compare unique materials ordered vs actually delivered via FULFILLED_BY relationship: count never-delivered materials. DIFFERENT from getUniqueMaterialsOrderedVsBilled which checks billing, not delivery.', params: {} },
     { name: 'analyzeBillingCancellationAnomaly', description: 'Analyze anomaly between billing_document_headers and billing_document_cancellations: counts and missing CANCELS edges', params: {} },
     // Analytics risk/anomaly functions
     { name: 'getBlockedCustomersWithOrders', description: 'Find blocked customers who still have active sales orders — compliance risk', params: {} },

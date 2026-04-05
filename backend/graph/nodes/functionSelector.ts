@@ -36,11 +36,10 @@ const SYNONYM_MAP: Record<string, string> = {
   'account': 'customer',
   'business partner': 'customer',
   'BP': 'customer',
-  // Revenue synonyms
+  // Revenue synonyms — NOTE: 'sales' intentionally excluded to preserve
+  // SAP-specific terms like "sales organization", "sales order", "sales area"
   'income': 'revenue',
   'earnings': 'revenue',
-  'sales': 'revenue',
-  'turnover': 'revenue',
   // Status synonyms
   'outstanding': 'unpaid',
   'overdue': 'unpaid',

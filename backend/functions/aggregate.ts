@@ -374,3 +374,59 @@ export async function getPaymentCollectionRate(): Promise<FunctionResult> {
   const records = await runQuery(cypher, {});
   return wrapResult(records, 'getPaymentCollectionRate');
 }
+
+// ── getShippingPointBreakdown ─────────────────────────────────────────────────
+// Counts how many delivery documents each shipping point handled.
+export async function getShippingPointBreakdown(): Promise<FunctionResult> {
+  const cypher = `
+    MATCH (dh:DeliveryHeader)
+    WHERE dh.shippingPoint IS NOT NULL
+    WITH dh.shippingPoint AS shippingPoint, count(DISTINCT dh) AS deliveryCount
+    RETURN shippingPoint, deliveryCount
+    ORDER BY deliveryCount DESC
+  `;
+  const records = await runQuery(cypher, {});
+  return wrapResult(records, 'getShippingPointBreakdown');
+}
+
+// ── getSalesOrderValueByChannel ───────────────────────────────────────────────
+// Per-distribution-channel stats: avg, min, max sales order value.
+export async function getSalesOrderValueByChannel(): Promise<FunctionResult> {
+  const cypher = `
+    MATCH (so:SalesOrder)
+    WHERE so.totalNetAmount IS NOT NULL AND so.distributionChannel IS NOT NULL
+    WITH so.distributionChannel AS channel, toFloat(so.totalNetAmount) AS val
+    WITH channel,
+         count(val)                       AS orderCount,
+         round(min(val)*100)/100.0        AS minValue,
+         round(max(val)*100)/100.0        AS maxValue,
+         round(avg(val)*100)/100.0        AS avgValue,
+         round(sum(val)*100)/100.0        AS totalValue
+    RETURN channel, orderCount, minValue, maxValue, avgValue, totalValue
+    ORDER BY totalValue DESC
+  `;
+  const records = await runQuery(cypher, {});
+  return wrapResult(records, 'getSalesOrderValueByChannel');
+}
+
+// ── getBillingDocsByCreationDate ──────────────────────────────────────────────
+// Groups billing documents by creation date: total count, cancelled count,
+// active count, and total net amount per date.
+export async function getBillingDocsByCreationDate(): Promise<FunctionResult> {
+  const cypher = `
+    MATCH (bh:BillingHeader)
+    WHERE bh.creationDate IS NOT NULL
+    WITH bh.creationDate AS creationDate,
+         count(bh)                                                            AS totalDocs,
+         sum(CASE WHEN bh.billingDocumentIsCancelled = true  THEN 1 ELSE 0 END) AS cancelledDocs,
+         sum(CASE WHEN bh.billingDocumentIsCancelled = false OR bh.billingDocumentIsCancelled IS NULL THEN 1 ELSE 0 END) AS activeDocs,
+         round(sum(CASE WHEN bh.billingDocumentIsCancelled = false OR bh.billingDocumentIsCancelled IS NULL
+                        THEN toFloat(bh.totalNetAmount) ELSE 0 END)*100)/100.0 AS activeNetAmount,
+         head(collect(DISTINCT bh.transactionCurrency)) AS currency
+    RETURN creationDate, totalDocs, cancelledDocs, activeDocs, activeNetAmount, currency
+    ORDER BY creationDate ASC
+  `;
+  const records = await runQuery(cypher, {});
+  return wrapResult(records, 'getBillingDocsByCreationDate');
+}
+
