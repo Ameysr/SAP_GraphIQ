@@ -11,7 +11,7 @@ import { QUERY_LIBRARY, type QueryExample } from './queryLibrary.js';
 const NODE_SCHEMAS: Record<string, string> = {
   Customer: 'Customer {id(string, e.g. "320000083"), businessPartnerFullName(string), businessPartnerName(string), businessPartnerIsBlocked(boolean), customer(string), creationDate(string)}',
   SalesOrder: 'SalesOrder {id(string), salesOrder(string, e.g. "740586"), soldToParty(string = customer id), totalNetAmount(string — use toFloat()), transactionCurrency(string, e.g. "INR"), salesOrganization(string, e.g. "IN01"), creationDate(string, e.g. "2025-04-10"), overallDeliveryStatus(string), overallOrdReltdBillgStatus(string), customerPaymentTerms(string, e.g. "Z001"/"Z009"), incotermsClassification(string), distributionChannel(string), requestedDeliveryDate(string)}',
-  SalesOrderItem: 'SalesOrderItem {id(string = salesOrder_salesOrderItem), salesOrder(string), salesOrderItem(string, e.g. "10"), material(string), netAmount(string — use toFloat()), materialGroup(string)}',
+  SalesOrderItem: 'SalesOrderItem {id(string = salesOrder_salesOrderItem), salesOrder(string), salesOrderItem(string, e.g. "10"), material(string), netAmount(string — use toFloat()), materialGroup(string), requestedQuantity(string — use toFloat())}',
   ScheduleLine: 'ScheduleLine {id(string), salesOrder(string), salesOrderItem(string), scheduleLine(string), confirmedDeliveryDate(string)}',
   Product: 'Product {id(string), product(string, e.g. "MZ-FG-S300"), productDescription(string), productGroup(string)}',
   DeliveryHeader: 'DeliveryHeader {id(string), deliveryDocument(string, e.g. "800066830"), creationDate(string), deliveryDate(string), shippingPoint(string), overallGoodsMovementStatus(string, "A"=not moved, "C"=complete)}',

@@ -39,7 +39,7 @@ export async function compareCustomerOrders(customerId1: string, customerId2: st
            c.businessPartnerIsBlocked AS isBlocked,
            count(DISTINCT so) AS totalOrders,
            sum(toFloat(so.totalNetAmount)) AS totalOrderValue,
-           count(DISTINCT soi) AS deliveredItems,
+           count(DISTINCT soi) AS itemsWithDeliveries,
            head(collect(so.transactionCurrency)) AS currency
     ORDER BY totalOrders DESC
   `;

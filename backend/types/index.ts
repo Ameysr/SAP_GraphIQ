@@ -5,7 +5,7 @@ export type IntentType =
 export type ComplexityLevel = 'SIMPLE' | 'MEDIUM' | 'COMPLEX';
 export type PathTaken = 'function' | 'template' | 'constrained' | 'schema';
 export type TierNumber = 1 | 2 | 3;
-export type LLMProvider = 'groq' | 'deepseek' | 'gemini';
+export type LLMProvider = 'groq' | 'deepseek';
 export type Confidence = 'high' | 'medium' | 'low' | '';
 
 export interface HistoryMessage {

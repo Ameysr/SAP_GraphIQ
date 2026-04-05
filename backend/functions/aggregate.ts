@@ -29,9 +29,12 @@ export async function getTopProducts(
   // metric === 'delivery'
   const cypher = `
     MATCH (di:DeliveryItem)-[:PART_OF]->(dh:DeliveryHeader)
-    RETURN di.referenceSdDocument AS refSO, di.referenceSdDocumentItem AS refItem,
-           dh.deliveryDocument AS dd
-    LIMIT 500
+    MATCH (soi:SalesOrderItem)-[:FULFILLED_BY]->(di)
+    MATCH (soi)-[:REFERENCES]->(p:Product)
+    WITH p.id AS productId, p.productDescription AS name, count(DISTINCT di) AS deliveryItemCount
+    RETURN productId, name, deliveryItemCount
+    ORDER BY deliveryItemCount DESC
+    LIMIT $limit
   `;
   const records = await runQuery(cypher, { limit: safeLimit });
   return wrapResult(records, 'getTopProducts');
@@ -238,9 +241,9 @@ export async function getAllCustomersWithOrderCounts(limit: number): Promise<Fun
       c.businessPartnerFullName AS customerName,
       count(so) AS orderCount
     ORDER BY orderCount DESC
-    LIMIT ${safeLimit}
+    LIMIT $limit
   `;
-  const records = await runQuery(cypher, {});
+  const records = await runQuery(cypher, { limit: safeLimit });
   return wrapResult(records, 'getAllCustomersWithOrderCounts');
 }
 
@@ -321,9 +324,9 @@ export async function getTopMaterialsByBilledQuantity(limit: number): Promise<Fu
            round(totalBilledNetAmount * 100) / 100.0 AS totalBilledNetAmount,
            currency
     ORDER BY totalBilledQty DESC
-    LIMIT ${safeLimit}
+    LIMIT $limit
   `;
-  const records = await runQuery(cypher, {});
+  const records = await runQuery(cypher, { limit: safeLimit });
   return wrapResult(records, 'getTopMaterialsByBilledQuantity');
 }
 

@@ -11,15 +11,15 @@ import type { Confidence, ObservabilityLog } from '../../types/index.js';
 const DETERMINISTIC_TEMPLATES: Record<string, (results: Record<string, unknown>[], question: string) => string> = {
   getActiveBillingTotals: (results) => {
     const r = results[0] ?? {};
-    return `**${r.activeDocs}** out of **${r.totalDocs}** billing documents are active (non-cancelled), representing **${r.activePercentage}%** of all billing docs.\n\nThe combined total net amount from active billing documents is **${r.currency} ${Number(r.activeTotalNetAmount).toLocaleString()}**.`;
+    return `**${r.activeDocs ?? 0}** out of **${r.totalDocs ?? 0}** billing documents are active (non-cancelled), representing **${r.activePercentage ?? 0}%** of all billing docs.\n\nThe combined total net amount from active billing documents is **${r.currency ?? 'INR'} ${r.activeTotalNetAmount != null ? Number(r.activeTotalNetAmount).toLocaleString() : 'N/A'}**.`;
   },
   getTopActiveBillingMonthRevenue: (results) => {
     const r = results[0] ?? {};
-    return `The month with the highest active (non-cancelled) billing revenue is **${r.month}** with **${r.currency} ${Number(r.activeRevenueAmount).toLocaleString()}**.\n\nThis represents **${r.activeRevenuePercentage}%** of the total active billing revenue of **${r.currency} ${Number(r.activeRevenueTotal).toLocaleString()}**.`;
+    return `The month with the highest active (non-cancelled) billing revenue is **${r.month ?? 'N/A'}** with **${r.currency ?? 'INR'} ${r.activeRevenueAmount != null ? Number(r.activeRevenueAmount).toLocaleString() : 'N/A'}**.\n\nThis represents **${r.activeRevenuePercentage ?? 0}%** of the total active billing revenue of **${r.currency ?? 'INR'} ${r.activeRevenueTotal != null ? Number(r.activeRevenueTotal).toLocaleString() : 'N/A'}**.`;
   },
   getO2CHealthSummary: (results) => {
     const r = results[0] ?? {};
-    return `**O2C Pipeline Health Summary**\n\n- **Sales Orders**: ${r.totalOrders}\n- **Deliveries**: ${r.totalDeliveries}\n- **Active Invoices**: ${r.totalInvoices}\n- **Total Billed**: INR ${Number(r.totalBilled).toLocaleString()}\n- **Payments**: ${r.totalPayments}\n- **Total Collected**: INR ${Number(r.totalCollected).toLocaleString()}`;
+    return `**O2C Pipeline Health Summary**\n\n- **Sales Orders**: ${r.totalOrders ?? 0}\n- **Deliveries**: ${r.totalDeliveries ?? 0}\n- **Active Invoices**: ${r.totalInvoices ?? 0}\n- **Total Billed**: INR ${r.totalBilled != null ? Number(r.totalBilled).toLocaleString() : 'N/A'}\n- **Payments**: ${r.totalPayments ?? 0}\n- **Total Collected**: INR ${r.totalCollected != null ? Number(r.totalCollected).toLocaleString() : 'N/A'}`;
   },
   getDeliveryFulfillmentRate: (results) => {
     const lines = results.slice(0, 20).map((r, i) => {
@@ -480,6 +480,11 @@ ${resultsStr}
   // Append disclaimer for low confidence
   if (confidence === 'low') {
     answer += ' (Note: this answer was dynamically generated — please verify against source data)';
+  }
+
+  // Bug #18 fix: Surface validation warnings directly to the user
+  if (validationWarning) {
+    answer += `\n\n${validationWarning}`;
   }
 
   const latencyMs = Date.now() - state.startTime;

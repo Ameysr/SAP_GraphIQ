@@ -9,10 +9,16 @@ function toIsoDateOnlyUTC(d: Date): string {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
+// ── DATASET REFERENCE DATE ────────────────────────────────────────────────────
+// The SAP O2C data covers April–May 2025. Using the current system date causes
+// "this month" / "last month" functions to return empty results.
+// Use a fixed reference anchored to the dataset's time range.
+const DATASET_REFERENCE_DATE = process.env.DATASET_REFERENCE_DATE ?? '2025-05-01';
+
 function monthBoundsUTC(offsetMonths: number): { startDate: string; endDate: string; monthLabel: string } {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths + 1, 1));
+  const ref = new Date(DATASET_REFERENCE_DATE + 'T00:00:00Z');
+  const start = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth() + offsetMonths, 1));
+  const end = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth() + offsetMonths + 1, 1));
   const monthLabel = start.toISOString().slice(0, 7); // YYYY-MM
   return { startDate: toIsoDateOnlyUTC(start), endDate: toIsoDateOnlyUTC(end), monthLabel };
 }

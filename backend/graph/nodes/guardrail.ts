@@ -54,6 +54,8 @@ export function enforceSizeLimit(cypher: string): string {
 // ── KEYWORD-BASED INTENT RULES (no LLM cost) ────────────────────────────────
 // Word-boundary regex patterns for intent classification
 // Using \b prevents "accounting" matching "count", "customerId" matching "most", etc.
+// ORDER MATTERS: DETECT has priority over TRAVERSE, TRAVERSE over AGGREGATE, etc.
+// But LOOKUP is checked first in classifyIntentByKeyword when an entity ID is present.
 const INTENT_RULES: Array<{ patterns: RegExp[]; intent: IntentType }> = [
   {
     patterns: [/\bbroken\b/i, /\bmissing\b/i, /\bnot billed\b/i, /\bunpaid\b/i, /\bincomplete\b/i, /\bno delivery\b/i, /\bnot paid\b/i, /\bundelivered\b/i, /\bunbilled\b/i, /\banomal/i, /\bfulfillment\b/i, /\bcancelled after\b/i, /\bcancelled before\b/i],
@@ -64,7 +66,12 @@ const INTENT_RULES: Array<{ patterns: RegExp[]; intent: IntentType }> = [
     intent: 'TRAVERSE',
   },
   {
-    patterns: [/\btop\s+\d/i, /\bmost\b/i, /\bcount\b/i, /\bhow many\b/i, /\bhighest\b/i, /\blowest\b/i, /\brank\b/i, /\bbest\b/i, /\bworst\b/i, /\btotal\b/i, /\bsum\b/i, /\baverage\b/i, /\bdistribution\b/i, /\bdistributed\b/i, /\bclearing time\b/i, /\bpayment term/i, /\bexpensive\b/i, /\bpercentage\b/i, /\b%\b/],
+    patterns: [/\btop\s+\d/i, /\bcount\b/i, /\bhow many\b/i, /\bhighest\b/i, /\blowest\b/i, /\brank\b/i, /\bbest\b/i, /\bworst\b/i, /\btotal\b/i, /\bsum\b/i, /\baverage\b/i, /\bdistribution\b/i, /\bdistributed\b/i, /\bclearing time\b/i, /\bpayment term/i, /\bexpensive\b/i, /\bpercentage\b/i, /\b%\b/],
+    intent: 'AGGREGATE',
+  },
+  {
+    // "most" is checked separately — only counts as AGGREGATE when no entity ID present
+    patterns: [/\bmost\b/i],
     intent: 'AGGREGATE',
   },
   {
@@ -319,7 +326,8 @@ Return relevant: true for ANY question about:
 - O2C business process analysis, broken flows, incomplete chains
 - Financial analysis: "most expensive", "highest billing", "largest invoice", "payment terms", "clearing time", "fulfillment rate", "journal distribution"
 - Follow-up questions like "tell me more", "show names", "give details"
-Return relevant: false for: general knowledge, coding help, creative writing, personal questions, weather, news.`;
+Return relevant: false for: general knowledge, coding help, creative writing, personal questions, weather, news.
+Note: If confidence is below 0.5, the system will block the query. Set confidence >= 0.5 for borderline SAP-related questions.`;
 
   const userPrompt = `User question: "${msg}"`;
 
@@ -397,12 +405,18 @@ function classifyIntentByKeyword(msg: string): IntentType | null {
   const lower = msg.toLowerCase();
 
   // If the question mentions a specific entity ID and asks for details, it's LOOKUP — check first
+  // This prevents "show me most details about order 740506" from matching AGGREGATE due to /most/
   const hasEntityId = /\b\d{6,10}\b/.test(msg);
   if (hasEntityId && (lower.includes('details') || lower.includes('what is') || lower.includes('show me'))) {
     return 'LOOKUP';
   }
 
   for (const rule of INTENT_RULES) {
+    // Skip the standalone "most" AGGREGATE rule when an entity ID is present
+    // "Show me most details about order X" should be LOOKUP, not AGGREGATE
+    if (rule.intent === 'AGGREGATE' && hasEntityId && rule.patterns.length === 1 && rule.patterns[0].source === '\\bmost\\b') {
+      continue;
+    }
     if (rule.patterns.some(p => p.test(lower))) {
       return rule.intent;
     }

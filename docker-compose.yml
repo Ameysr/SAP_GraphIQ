@@ -26,8 +26,6 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - FRONTEND_URL=http://localhost
-    volumes:
-      - ./data:/app/data:ro
     networks:
       - sap-o2c-network
     healthcheck:

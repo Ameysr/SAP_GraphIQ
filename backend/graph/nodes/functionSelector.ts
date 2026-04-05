@@ -81,9 +81,7 @@ function expandSynonyms(message: string): string {
   for (const [synonym, canonical] of Object.entries(SYNONYM_MAP)) {
     // Word-boundary match, case-insensitive
     const regex = new RegExp(`\\b${synonym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-    if (regex.test(expanded)) {
-      expanded = expanded.replace(regex, canonical);
-    }
+    expanded = expanded.replace(regex, canonical);
   }
   return expanded;
 }

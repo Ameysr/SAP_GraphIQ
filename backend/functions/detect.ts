@@ -68,9 +68,10 @@ export async function getCancelledDocs(limit: number): Promise<FunctionResult> {
     OPTIONAL MATCH (bc)-[:CANCELS]->(bh:BillingHeader)
     OPTIONAL MATCH (bh)<-[:PART_OF]-(:BillingItem)<-[:BILLED_IN]-(dh:DeliveryHeader)
     RETURN bc.id AS cancelledDocId, bc.totalNetAmount AS amount,
-           bc.billingDocumentDate AS docDate, bc.transactionCurrency AS currency,
+           bc.billingDocument AS cancellingBillingDoc, bc.transactionCurrency AS currency,
+           bh.billingDocumentDate AS originalDocDate,
            collect(DISTINCT dh.id)[..3] AS relatedDeliveries
-    ORDER BY bc.billingDocumentDate DESC LIMIT $limit
+    ORDER BY bh.billingDocumentDate DESC LIMIT $limit
   `;
   const records = await runQuery(cypher, { limit: safeLimit });
   return wrapResult(records, 'getCancelledDocs');

@@ -6,6 +6,9 @@
 import { runQuery } from '../db.js';
 import type { FunctionResult, QueryResult } from '../types/index.js';
 
+// The SAP O2C data covers April–May 2025. Using date() (today) causes wrong results.
+const DATASET_REF_DATE = process.env.DATASET_REFERENCE_DATE ?? '2025-05-01';
+
 function wrapResult(records: QueryResult[], funcName: string): FunctionResult {
   return { records, metadata: { count: records.length, functionName: funcName } };
 }
@@ -37,7 +40,7 @@ export async function getARAgingBuckets(): Promise<FunctionResult> {
     AND NOT (bh)-[:PAID_BY]->(:Payment)
     AND bh.billingDocumentDate IS NOT NULL
     WITH bh,
-         date() - date(bh.billingDocumentDate) AS age,
+         date($refDate) - date(bh.billingDocumentDate) AS age,
          toFloat(bh.totalNetAmount) AS amount
     WITH bh.soldToParty AS cid,
          sum(CASE WHEN age.days <= 30 THEN amount ELSE 0 END) AS bucket0_30,
@@ -52,7 +55,7 @@ export async function getARAgingBuckets(): Promise<FunctionResult> {
            round(bucket90plus*100)/100.0 AS aging_90plus
     ORDER BY aging_90plus DESC
   `;
-  const records = await runQuery(cypher, {});
+  const records = await runQuery(cypher, { refDate: DATASET_REF_DATE });
   return wrapResult(records, 'getARAgingBuckets');
 }
 
@@ -146,16 +149,16 @@ export async function getCustomerOrderRecency(): Promise<FunctionResult> {
          CASE WHEN size(orderDates) = 0 THEN null
               ELSE reduce(latest = orderDates[0], d IN orderDates | CASE WHEN d > latest THEN d ELSE latest END)
          END AS lastOrderDate
-    WHERE lastOrderDate IS NULL OR lastOrderDate < toString(date() - duration('P180D'))
+    WHERE lastOrderDate IS NULL OR lastOrderDate < toString(date($refDate) - duration('P180D'))
     RETURN c.businessPartnerFullName AS customer, c.id AS customerId,
            lastOrderDate,
            CASE WHEN lastOrderDate IS NOT NULL
-                THEN duration.between(date(lastOrderDate), date()).days
+                THEN duration.between(date(lastOrderDate), date($refDate)).days
                 ELSE null END AS daysSinceLastOrder
     ORDER BY daysSinceLastOrder DESC
     LIMIT 50
   `;
-  const records = await runQuery(cypher, {});
+  const records = await runQuery(cypher, { refDate: DATASET_REF_DATE });
   return wrapResult(records, 'getCustomerOrderRecency');
 }
 
@@ -181,17 +184,17 @@ export async function getOverdueDeliveries(): Promise<FunctionResult> {
   const cypher = `
     MATCH (soi:SalesOrderItem)-[:HAS_SCHEDULE_LINE]->(sl:ScheduleLine)
     WHERE sl.confirmedDeliveryDate IS NOT NULL
-    AND date(sl.confirmedDeliveryDate) < date()
+    AND date(sl.confirmedDeliveryDate) < date($refDate)
     AND NOT EXISTS { MATCH (soi)-[:FULFILLED_BY]->(:DeliveryItem) }
     OPTIONAL MATCH (so:SalesOrder)-[:HAS_ITEM]->(soi)
     OPTIONAL MATCH (c:Customer {id: so.soldToParty})
     RETURN so.salesOrder AS salesOrder, soi.salesOrderItem AS salesOrderItem,
            sl.confirmedDeliveryDate AS confirmedDate,
-           duration.between(date(sl.confirmedDeliveryDate), date()).days AS daysOverdue,
+           duration.between(date(sl.confirmedDeliveryDate), date($refDate)).days AS daysOverdue,
            c.businessPartnerFullName AS customer
     ORDER BY daysOverdue DESC LIMIT 20
   `;
-  const records = await runQuery(cypher, {});
+  const records = await runQuery(cypher, { refDate: DATASET_REF_DATE });
   return wrapResult(records, 'getOverdueDeliveries');
 }
 

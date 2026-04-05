@@ -58,20 +58,14 @@ const adminLimiter = rateLimit({
   message: { error: 'Admin rate limit exceeded.' },
 });
 
-// ── INPUT SANITIZATION MIDDLEWARE ──────────────────────────────────────────────
-// Strips Cypher injection attempts from chat messages
-function sanitizeInput(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+// ── INPUT SIZE LIMIT MIDDLEWARE ────────────────────────────────────────────────
+// Only enforce message length limit. Cypher injection prevention is handled by
+// the guardrail node's 5-layer keyword blocklist + whitelist (guardrail.ts),
+// which is more sophisticated and avoids blocking legitimate questions.
+function limitInputSize(req: express.Request, _res: express.Response, next: express.NextFunction): void {
   if (req.body && typeof req.body.message === 'string') {
-    const msg = req.body.message as string;
-    // Block dangerous Cypher keywords if they appear as commands
-    const dangerousPatterns = /\b(CREATE|DELETE|SET|DROP|DETACH|MERGE|REMOVE|CALL\s+db)\b/i;
-    if (dangerousPatterns.test(msg)) {
-      req.body.message = msg.replace(dangerousPatterns, '[BLOCKED]');
-      console.warn(`  [Security] Sanitized dangerous input: "${msg.substring(0, 80)}..."`);
-    }
-    // Limit message length
-    if (msg.length > 1000) {
-      req.body.message = msg.substring(0, 1000);
+    if (req.body.message.length > 1000) {
+      req.body.message = req.body.message.substring(0, 1000);
     }
   }
   next();
@@ -163,7 +157,7 @@ app.get('/api/suggestions', (_req, res) => {
 });
 
 // Routes
-app.use('/api/chat', chatLimiter, sanitizeInput, chatRouter);
+app.use('/api/chat', chatLimiter, limitInputSize, chatRouter);
 app.use('/api/graph', graphRouter);
 app.use('/api/admin', adminLimiter, adminRouter);
 

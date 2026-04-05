@@ -63,7 +63,7 @@ export async function traceOrderJourney(orderId: string): Promise<FunctionResult
            soi.requestedQuantity AS orderedQty,
            dh.deliveryDocument AS deliveryDocument,
            dh.creationDate AS deliveryDocCreatedDate,
-           dh.actualGoodsMovementDate AS actualGoodsMovementDate,
+           coalesce(dh.actualGoodsMovementDate, dh.creationDate) AS actualGoodsMovementDate,
            di.actualDeliveryQuantity AS deliveredQty,
            bh.billingDocument AS billingDocument,
            bh.billingDocumentDate AS billingDate,

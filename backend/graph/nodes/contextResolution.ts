@@ -27,7 +27,7 @@ export async function contextResolution(
     ];
 
     for (const { pattern, value } of replacements) {
-      if (value && pattern.test(resolved)) {
+      if (value) {
         resolved = resolved.replace(pattern, value);
       }
     }

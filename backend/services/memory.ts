@@ -4,7 +4,7 @@ import type { HistoryMessage, EntityMap } from '../types/index.js';
 const MAX_MESSAGES = 20; // Allow 10 Q&A pairs (each pair = 2 messages: user + assistant)
 const HISTORY_TTL = 3600; // 1 hour
 const ENTITY_TTL = 3600;
-const MAX_ENTITY_TYPES = 3;
+const MAX_ENTITY_TYPES = 6;
 
 function historyKey(sessionId: string): string {
   return `memory:history:${sessionId}`;
@@ -49,7 +49,8 @@ export async function getHistory(sessionId: string): Promise<HistoryMessage[]> {
     const redis = getRedis();
     const raw = await redis.lrange(historyKey(sessionId), 0, -1);
     return raw.map((s: string) => JSON.parse(s) as HistoryMessage);
-  } catch {
+  } catch (err) {
+    console.error('[Memory] Get history failed:', err);
     return [];
   }
 }
