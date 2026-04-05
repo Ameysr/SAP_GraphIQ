@@ -842,4 +842,84 @@ RETURN round(totalBilled * 100) / 100.0 AS totalActiveBilled,
        currency`,
     schemaNodes: ['BillingHeader', 'Payment'],
   },
+  // ── NEW: Examples to prevent semantic collision with similar-sounding queries ──
+  {
+    question: 'How many unique shipping points are used across all deliveries? List each shipping point and delivery count.',
+    cypher: `MATCH (dh:DeliveryHeader)
+WHERE dh.shippingPoint IS NOT NULL
+WITH dh.shippingPoint AS shippingPoint, count(DISTINCT dh) AS deliveryCount
+RETURN shippingPoint, deliveryCount
+ORDER BY deliveryCount DESC`,
+    schemaNodes: ['DeliveryHeader'],
+  },
+  {
+    question: 'How many materials were ordered but never appeared in any delivery (via FULFILLED_BY)?',
+    cypher: `MATCH (soi:SalesOrderItem) WHERE soi.material IS NOT NULL
+WITH collect(DISTINCT soi.material) AS orderedMaterials
+MATCH (soi2:SalesOrderItem)-[:FULFILLED_BY]->(:DeliveryItem) WHERE soi2.material IS NOT NULL
+WITH orderedMaterials, collect(DISTINCT soi2.material) AS deliveredMaterials
+WITH orderedMaterials, deliveredMaterials,
+     [m IN orderedMaterials WHERE NOT m IN deliveredMaterials] AS neverDelivered
+RETURN size(orderedMaterials) AS totalMaterialsOrdered,
+       size(deliveredMaterials) AS totalMaterialsDelivered,
+       size(neverDelivered) AS neverDeliveredCount,
+       neverDelivered[..15] AS sampleNeverDelivered`,
+    schemaNodes: ['SalesOrderItem', 'DeliveryItem'],
+  },
+  {
+    question: 'For each distribution channel, what is the average minimum and maximum sales order value?',
+    cypher: `MATCH (so:SalesOrder)
+WHERE so.totalNetAmount IS NOT NULL AND so.distributionChannel IS NOT NULL
+WITH so.distributionChannel AS channel, toFloat(so.totalNetAmount) AS val
+WITH channel, count(val) AS orderCount,
+     round(min(val)*100)/100.0 AS minValue, round(max(val)*100)/100.0 AS maxValue,
+     round(avg(val)*100)/100.0 AS avgValue, round(sum(val)*100)/100.0 AS totalValue
+RETURN channel, orderCount, minValue, maxValue, avgValue, totalValue
+ORDER BY totalValue DESC`,
+    schemaNodes: ['SalesOrder'],
+  },
+  {
+    question: 'How many billing documents were created on each date with cancelled and active counts?',
+    cypher: `MATCH (bh:BillingHeader) WHERE bh.creationDate IS NOT NULL
+WITH bh.creationDate AS creationDate,
+     count(bh) AS totalDocs,
+     sum(CASE WHEN bh.billingDocumentIsCancelled = true THEN 1 ELSE 0 END) AS cancelledDocs,
+     sum(CASE WHEN bh.billingDocumentIsCancelled = false OR bh.billingDocumentIsCancelled IS NULL THEN 1 ELSE 0 END) AS activeDocs,
+     round(sum(CASE WHEN bh.billingDocumentIsCancelled = false OR bh.billingDocumentIsCancelled IS NULL
+                    THEN toFloat(bh.totalNetAmount) ELSE 0 END)*100)/100.0 AS activeNetAmount,
+     head(collect(DISTINCT bh.transactionCurrency)) AS currency
+RETURN creationDate, totalDocs, cancelledDocs, activeDocs, activeNetAmount, currency
+ORDER BY creationDate ASC`,
+    schemaNodes: ['BillingHeader'],
+  },
+  // ── E2 FIX: Company code and fiscal year across billing docs ──
+  // Company code is on CustomerCompany (via Customer → ASSIGNED_TO_COMPANY → CustomerCompany)
+  // Fiscal year is on JournalEntry (via BillingHeader → POSTED_AS → JournalEntry)
+  // NOTE: NOT on BillingHeader directly. Do NOT extract from glAccount substring.
+  {
+    question: 'What company code and fiscal year are used across all billing documents?',
+    cypher: `MATCH (bh:BillingHeader)
+WITH bh, bh.soldToParty AS customerId
+OPTIONAL MATCH (c:Customer {id: customerId})-[:ASSIGNED_TO_COMPANY]->(cc:CustomerCompany)
+OPTIONAL MATCH (bh)-[:POSTED_AS]->(je:JournalEntry)
+WITH coalesce(cc.companyCode, 'N/A') AS companyCode,
+     coalesce(je.fiscalYear, substring(bh.billingDocumentDate, 0, 4)) AS fiscalYear,
+     count(DISTINCT bh.billingDocument) AS billingDocumentCount,
+     round(sum(toFloat(bh.totalNetAmount))*100)/100.0 AS totalNetAmount
+RETURN DISTINCT companyCode, fiscalYear, billingDocumentCount, totalNetAmount
+ORDER BY billingDocumentCount DESC`,
+    schemaNodes: ['BillingHeader', 'Customer', 'CustomerCompany', 'JournalEntry'],
+  },
+  // ── E4 FIX: Sales org, distribution channel, AND division ──
+  // IMPORTANT: The field is so.organizationDivision, NOT so.division
+  {
+    question: 'What sales organization, distribution channels, and division are used across all sales orders?',
+    cypher: `MATCH (so:SalesOrder)
+RETURN DISTINCT so.salesOrganization AS salesOrganization,
+       so.distributionChannel AS distributionChannel,
+       so.organizationDivision AS division,
+       count(so) AS orderCount
+ORDER BY orderCount DESC`,
+    schemaNodes: ['SalesOrder'],
+  },
 ];
