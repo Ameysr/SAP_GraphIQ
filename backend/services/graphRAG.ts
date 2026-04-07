@@ -5,6 +5,7 @@
 import { getLocalEmbedding } from './embedding.js';
 import { cosineSimilarity } from '../utils/math.js';
 import { QUERY_LIBRARY, type QueryExample } from './queryLibrary.js';
+import { getLiveSchema, getFormattedNodeSchema, getRelationshipsForNode, getAllFormattedSchemas, getAllRelationshipStrings } from './schemaAgent.js';
 
 // ── SCHEMA FRAGMENTS ──────────────────────────────────────────────────────────
 // Each node type's schema as a string — only the relevant ones are sent to LLM
@@ -66,7 +67,12 @@ CRITICAL RULES:
 - To join BillingHeader to Payment for clearing time: use Payment.accountingDocument = BillingHeader.accountingDocument
 - For aggregation queries (COUNT, SUM) — put LIMIT AFTER the aggregation, NOT before
 ⚠️ DATASET DATE RANGE: The SAP O2C data primarily covers April 2025. Queries using date() ("today"), "this month", or "last 30 days" will likely return EMPTY results. If the user asks about "this month" or "recent", consider filtering for April 2025 instead.
-⚠️ USE ONLY THE RELATIONSHIPS LISTED BELOW. DO NOT INVENT NEW ONES.`;
+⚠️ USE ONLY THE RELATIONSHIPS LISTED BELOW. DO NOT INVENT NEW ONES.
+
+SAP FIELD MAPPING HINTS:
+- Product "type" or "category" = productGroup field (e.g. "ZFS1", "ZF01", "ZPKG"), NOT productDescription (which is the human-readable name)
+- SalesOrderItem "item category" = salesOrderItemCategory field (e.g. "TAN"), NOT materialGroup (which is different — material groups are like "ZFG1001")
+- "marked for archiving" = isMarkedForArchiving (boolean), different from "blocked" = businessPartnerIsBlocked (boolean)`;
 
 // ── EMBEDDING INDEX ───────────────────────────────────────────────────────────
 let libraryEmbedded = false;
@@ -131,6 +137,10 @@ export async function retrieveContext(question: string, topK: number = 5): Promi
     .join('\n\n');
 
   // ── BUILD SCHEMA SUBSET ──
+  // PREFER live schema from SchemaAgent (auto-discovered from Neo4j)
+  // FALLBACK to hardcoded NODE_SCHEMAS if agent hasn't run yet
+  const liveSchema = getLiveSchema();
+
   // Collect all node types from the matched examples
   const relevantNodes = new Set<string>();
   for (const { example } of scored) {
@@ -142,25 +152,66 @@ export async function retrieveContext(question: string, topK: number = 5): Promi
   // Always include Customer (it's the anchor of most queries)
   relevantNodes.add('Customer');
 
-  // Build mini-schema
-  const nodeLines = Array.from(relevantNodes)
-    .filter(n => NODE_SCHEMAS[n])
-    .map(n => `- ${NODE_SCHEMAS[n]}`);
+  let nodeLines: string[];
+  let relLines: string[];
 
-  // Collect relevant relationships (deduplicated)
-  const relSet = new Set<string>();
-  for (const node of relevantNodes) {
-    const rels = RELATIONSHIP_MAP[node] ?? [];
-    for (const rel of rels) {
-      relSet.add(rel);
+  if (liveSchema) {
+    // LIVE SCHEMA PATH: Use auto-discovered schema from Neo4j
+    // Include relevant nodes from examples + any additional nodes mentioned in the question
+    const questionLower = question.toLowerCase();
+    for (const node of liveSchema.nodes) {
+      if (questionLower.includes(node.label.toLowerCase())) {
+        relevantNodes.add(node.label);
+      }
     }
+
+    nodeLines = Array.from(relevantNodes)
+      .map(n => getFormattedNodeSchema(n))
+      .filter((s): s is string => s !== null)
+      .map(s => `- ${s}`);
+
+    // If we found less than 3 relevant nodes, include ALL schemas
+    // (better to give the LLM too much context than too little)
+    if (nodeLines.length < 3) {
+      const allSchemas = getAllFormattedSchemas();
+      nodeLines = Object.values(allSchemas).map(s => `- ${s}`);
+    }
+
+    // Collect relevant relationships (deduplicated)
+    const relSet = new Set<string>();
+    for (const node of relevantNodes) {
+      for (const rel of getRelationshipsForNode(node)) {
+        relSet.add(rel);
+      }
+    }
+    // If few relationships found, include all
+    if (relSet.size < 3) {
+      for (const rel of getAllRelationshipStrings()) {
+        relSet.add(rel);
+      }
+    }
+    relLines = Array.from(relSet);
+  } else {
+    // FALLBACK: Use hardcoded schemas (SchemaAgent hasn't run yet)
+    nodeLines = Array.from(relevantNodes)
+      .filter(n => NODE_SCHEMAS[n])
+      .map(n => `- ${NODE_SCHEMAS[n]}`);
+
+    const relSet = new Set<string>();
+    for (const node of relevantNodes) {
+      const rels = RELATIONSHIP_MAP[node] ?? [];
+      for (const rel of rels) {
+        relSet.add(rel);
+      }
+    }
+    relLines = Array.from(relSet);
   }
 
-  const schemaSubset = `Node types (ONLY these are relevant to this query):
+  const schemaSubset = `Node types (${liveSchema ? 'LIVE — auto-discovered from database' : 'STATIC — hardcoded'}):
 ${nodeLines.join('\n')}
 
 Relationships:
-${Array.from(relSet).join('\n')}
+${relLines.join('\n')}
 
 ${CRITICAL_NOTES}`;
 

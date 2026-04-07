@@ -67,7 +67,19 @@ export async function decomposeAndExecute(
 
 Break this complex question into 2-4 simpler sub-questions. Each sub-question should be answerable by a single Cypher query.
 
+DOMAIN CONTEXT — The O2C graph contains ONLY these entity types:
+Customer, SalesOrder, SalesOrderItem, ScheduleLine, Product, DeliveryHeader, DeliveryItem,
+BillingHeader, BillingItem, BillingCancellation, JournalEntry, Payment, Plant, Address
+
+KEY RELATIONSHIPS:
+- Customer -[:PLACED]-> SalesOrder -[:HAS_ITEM]-> SalesOrderItem -[:FULFILLED_BY]-> DeliveryItem
+- DeliveryItem -[:PART_OF]-> DeliveryHeader -[:BILLED_IN]-> BillingItem -[:PART_OF]-> BillingHeader
+- BillingHeader -[:PAID_BY]-> Payment, BillingHeader -[:POSTED_AS]-> JournalEntry
+- SalesOrderItem -[:REFERENCES]-> Product, DeliveryItem -[:AT_PLANT]-> Plant
+
 RULES:
+- Each sub-question must target ONE entity type or ONE relationship from the list above
+- Do NOT create sub-questions about entities that don't exist (e.g., "Supplier", "Warehouse", "PurchaseOrder", "Vendor")
 - Each sub-question must be self-contained (can be answered independently)
 - Order sub-questions from simplest to most complex
 - Keep entity IDs from the original question in each relevant sub-question

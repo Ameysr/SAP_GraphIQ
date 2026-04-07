@@ -61,7 +61,9 @@ const SYNONYM_MAP: Record<string, string> = {
   'facility': 'plant',
   'location': 'plant',
   // Product synonyms
-  'item': 'product',
+  // NOTE: 'item' intentionally excluded — in SAP, "item" usually means
+  // "line item" (SalesOrderItem, BillingItem), not "product". Mapping it
+  // to 'product' caused "item category" queries to misroute.
   'material': 'product',
   'SKU': 'product',
   'goods': 'product',
@@ -237,15 +239,27 @@ export async function functionSelector(
 
   // ── LLM FUNCTION SELECTION (last resort, 1 LLM call) ──────────────────────
   // Enhanced with: few-shot examples, confidence scoring, reasoning audit trail
-  const funcListStr = functions
+  // IMPORTANT: Show primary functions (intent-matched) AND secondary functions
+  // (from other intents) so the LLM can self-correct when intent is misclassified.
+  const primaryFunctions = functions;
+  const secondaryFunctions = allFunctions.filter(f => !functions.includes(f));
+
+  const primaryListStr = primaryFunctions
     .map((f) => `- ${f.name}(${Object.entries(f.params).map(([k, v]) => `${k}: ${v}`).join(', ')}): ${f.description}`)
     .join('\n');
 
-  const systemPrompt = `You are a function router for a SAP Order-to-Cash (O2C) graph intelligence system.
-Your job: given a user question, decide which function to call from the available list.
+  const secondaryListStr = secondaryFunctions.length > 0
+    ? secondaryFunctions
+        .map((f) => `- ${f.name}(${Object.entries(f.params).map(([k, v]) => `${k}: ${v}`).join(', ')}): ${f.description}`)
+        .join('\n')
+    : '';
 
-AVAILABLE FUNCTIONS:
-${funcListStr}
+  const systemPrompt = `You are a function router for a SAP Order-to-Cash (O2C) graph intelligence system.
+Your job: given a user question, decide which function to call from the available lists.
+
+PRIMARY FUNCTIONS (best match for detected intent "${intent}"):
+${primaryListStr}
+${secondaryListStr ? `\nSECONDARY FUNCTIONS (from other intent categories — use ONLY if no primary function matches):\n${secondaryListStr}` : ''}
 
 RESPONSE FORMAT — respond with ONLY this JSON, nothing else:
 {
@@ -283,6 +297,7 @@ Q: "What is the weather forecast for today?"
 A: { "matched": false, "confidence": 0.0, "reasoning": "This is not related to SAP Order-to-Cash data. No function handles weather queries." }
 
 RULES:
+- Prefer PRIMARY functions over SECONDARY — only use SECONDARY if no primary function genuinely matches
 - confidence must be between 0.0 and 1.0
 - Set confidence >= 0.9 only when the function EXACTLY matches the question intent
 - Set confidence 0.7-0.89 when the function partially matches (e.g., correct entity type but slightly different analysis)
@@ -326,9 +341,15 @@ Extracted entities: ${entitiesStr || 'none'}`;
 
       // ── CONFIDENCE THRESHOLD CHECK ──
       if (parsed.matched && parsed.function && confidence >= CONFIDENCE_THRESHOLD) {
-        const validFunc = functions.find((f: { name: string }) => f.name === parsed.function);
+        // Check primary functions first, then secondary (cross-intent) functions
+        const validFunc = primaryFunctions.find((f: { name: string }) => f.name === parsed.function)
+          || allFunctions.find((f: { name: string }) => f.name === parsed.function);
         if (validFunc) {
-          logFunctionSelection(state.resolvedMessage, parsed.function, 'function/llm', state.intentType, confidence, reasoning);
+          const isSecondary = !primaryFunctions.find((f: { name: string }) => f.name === parsed.function);
+          if (isSecondary) {
+            console.log(`  [FuncSelector] Cross-intent match: "${parsed.function}" from secondary list (intent was ${intent})`);
+          }
+          logFunctionSelection(state.resolvedMessage, parsed.function, isSecondary ? 'function/llm-cross-intent' : 'function/llm', state.intentType, confidence, reasoning);
           return {
             selectedFunction: { name: parsed.function, params: parsed.params ?? {} },
             pathTaken: 'function',

@@ -10,6 +10,7 @@ import { getRedis, closeRedis } from './redis.js';
 import { closeDriver, runQuery } from './db.js';
 import { getLLMStats } from './services/llm.js';
 import { initQuestionPlans } from './services/questionPlans.js';
+import { discoverSchema, getLiveSchema } from './services/schemaAgent.js';
 
 // Load .env from project root in dev; in production (Render) env vars are injected natively
 if (process.env.NODE_ENV !== 'production') {
@@ -263,9 +264,32 @@ server = app.listen(PORT, async () => {
   console.log(`   Metrics:     http://localhost:${PORT}/api/metrics`);
   console.log(`   Suggestions: http://localhost:${PORT}/api/suggestions`);
   await validateSchema();
+  // Discover full schema from Neo4j (auto-introspection)
+  try {
+    await discoverSchema();
+    console.log('   ✓ Schema Agent: live schema discovered');
+  } catch (e) {
+    console.log(`   ⚠ Schema Agent failed (will use hardcoded fallback): ${(e as Error).message?.substring(0, 80)}`);
+  }
   // Load question plans with TF-IDF embeddings
   await initQuestionPlans();
   console.log('');
+});
+
+// ── ADMIN: Manual schema refresh endpoint ─────────────────────────────────────
+app.post('/api/admin/refresh-schema', async (_req, res) => {
+  try {
+    const schema = await discoverSchema();
+    res.json({
+      status: 'ok',
+      nodeLabels: schema.totalNodeLabels,
+      relTypes: schema.totalRelTypes,
+      properties: schema.totalProperties,
+      discoveredAt: schema.discoveredAt,
+    });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
 });
 
 export default app;

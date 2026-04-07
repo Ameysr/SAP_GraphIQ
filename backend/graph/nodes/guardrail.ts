@@ -327,7 +327,15 @@ Return relevant: true for ANY question about:
 - Financial analysis: "most expensive", "highest billing", "largest invoice", "payment terms", "clearing time", "fulfillment rate", "journal distribution"
 - Follow-up questions like "tell me more", "show names", "give details"
 Return relevant: false for: general knowledge, coding help, creative writing, personal questions, weather, news.
-Note: If confidence is below 0.5, the system will block the query. Set confidence >= 0.5 for borderline SAP-related questions.`;
+Note: If confidence is below 0.5, the system will block the query. Set confidence >= 0.5 for borderline SAP-related questions.
+
+FEW-SHOT EXAMPLES:
+Q: "Which customer has the highest billing amount?" → { "relevant": true, "intent": "AGGREGATE", "complexity": "MEDIUM", "tier": 2, "confidence": 0.95 }
+Q: "Find orders that were delivered but never billed" → { "relevant": true, "intent": "DETECT", "complexity": "COMPLEX", "tier": 3, "confidence": 0.93 }
+Q: "Tell me about customer 320000083" → { "relevant": true, "intent": "LOOKUP", "complexity": "SIMPLE", "tier": 1, "confidence": 0.97 }
+Q: "Trace the full journey of sales order 740544" → { "relevant": true, "intent": "TRAVERSE", "complexity": "COMPLEX", "tier": 3, "confidence": 0.96 }
+Q: "Compare customer 320000082 vs 320000083" → { "relevant": true, "intent": "COMPARE", "complexity": "COMPLEX", "tier": 3, "confidence": 0.94 }
+Q: "What's the weather like in Mumbai?" → { "relevant": false, "intent": "UNKNOWN", "complexity": "SIMPLE", "tier": 1, "confidence": 0.98 }`;
 
   const userPrompt = `User question: "${msg}"`;
 

@@ -1213,6 +1213,29 @@
       }
     },
     {
+      "id": "plan-archiving-vs-blocked",
+      "critical": true,
+      "functionName": "getArchivingVsBlockedAnalysis",
+      "routingExamples": [
+        "How many business partners are marked for archiving?",
+        "Compare archived vs blocked customers",
+        "Which customers are marked for archiving vs blocked?",
+        "How many customers have the archiving flag set?",
+        "Archiving status analysis for business partners",
+        "How does archiving compare to blocked status across customers?",
+        "Customers flagged for archiving count"
+      ],
+      "contract": {
+        "requiredFields": [
+          "totalCustomers",
+          "archivedCount",
+          "blockedCount",
+          "neitherCount"
+        ],
+        "checks": []
+      }
+    },
+    {
       "id": "plan-incoterms-analysis",
       "critical": false,
       "functionName": "getIncotermsAnalysis",
@@ -1221,7 +1244,9 @@
         "Incoterms distribution in the system",
         "Which shipping terms are most common?",
         "Breakdown of incoterms classifications",
-        "Trade terms usage analysis"
+        "Trade terms usage analysis",
+        "What incoterms locations are used?",
+        "Are there multiple incoterms locations?"
       ],
       "contract": {
         "requiredFields": [

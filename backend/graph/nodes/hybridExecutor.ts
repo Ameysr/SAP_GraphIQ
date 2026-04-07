@@ -11,6 +11,7 @@ import * as detect from '../../functions/detect.js';
 import * as compare from '../../functions/compare.js';
 import * as meta from '../../functions/meta.js';
 import * as analytics from '../../functions/analytics.js';
+import { getValidNodeLabels, getValidRelationships } from '../../services/schemaAgent.js';
 
 // Map function names to actual implementations
 const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResult>> = {
@@ -112,13 +113,15 @@ const FUNCTION_MAP: Record<string, (...args: unknown[]) => Promise<FunctionResul
   getOrderValueDistribution: () => analytics.getOrderValueDistribution(),
   getDeliveryStatusBreakdown: () => analytics.getDeliveryStatusBreakdown(),
   getIncotermsAnalysis: () => analytics.getIncotermsAnalysis(),
+  getArchivingVsBlockedAnalysis: () => analytics.getArchivingVsBlockedAnalysis(),
 };
 
 // ── SCHEMA-AWARE CYPHER VALIDATION ────────────────────────────────────────────
 // Validates generated Cypher against the known graph schema to catch errors
 // BEFORE execution, saving Neo4j round-trips and retry cycles.
+// Uses LIVE schema from SchemaAgent when available, falls back to hardcoded sets.
 
-const VALID_NODE_LABELS = new Set([
+const HARDCODED_NODE_LABELS = new Set([
   'Customer', 'SalesOrder', 'SalesOrderItem', 'ScheduleLine', 'Product',
   'DeliveryHeader', 'DeliveryItem', 'BillingHeader', 'BillingItem',
   'BillingCancellation', 'JournalEntry', 'Payment', 'Plant', 'Address',
@@ -126,12 +129,22 @@ const VALID_NODE_LABELS = new Set([
   'ProductDescription', 'ProductStorageLocation',
 ]);
 
-const VALID_RELATIONSHIPS = new Set([
+const HARDCODED_RELATIONSHIPS = new Set([
   'PLACED', 'HAS_ITEM', 'HAS_SCHEDULE_LINE', 'REFERENCES', 'FULFILLED_BY',
   'PART_OF', 'AT_PLANT', 'BILLED_IN', 'POSTED_AS', 'PAID_BY', 'CANCELS',
   'HAS_ADDRESS', 'ASSIGNED_TO_COMPANY', 'SELLS_THROUGH', 'STOCKED_AT', 'IN_PLANT',
   'HAS_DESCRIPTION', 'FOR_PRODUCT',
 ]);
+
+function getEffectiveNodeLabels(): Set<string> {
+  const live = getValidNodeLabels();
+  return live.size > 0 ? live : HARDCODED_NODE_LABELS;
+}
+
+function getEffectiveRelationships(): Set<string> {
+  const live = getValidRelationships();
+  return live.size > 0 ? live : HARDCODED_RELATIONSHIPS;
+}
 
 // ── FULL RELATIONSHIP REFERENCE (injected into every Cypher generation prompt) ─
 const RELATIONSHIP_REFERENCE = `
@@ -224,8 +237,8 @@ function validateCypherSchema(cypher: string): string[] {
     if (!label) continue;
     // Skip Neo4j built-in labels and type casts
     if (['DISTINCT', 'NOT', 'NULL', 'WHERE', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'DESC', 'ASC', 'WITH', 'MATCH', 'RETURN', 'ORDER'].includes(label)) continue;
-    if (!VALID_NODE_LABELS.has(label)) {
-      warnings.push(`Unknown node label "${label}" — valid labels: ${[...VALID_NODE_LABELS].slice(0, 5).join(', ')}...`);
+    if (!getEffectiveNodeLabels().has(label)) {
+      warnings.push(`Unknown node label "${label}" — valid labels: ${[...getEffectiveNodeLabels()].slice(0, 5).join(', ')}...`);
     }
   }
 
@@ -233,8 +246,8 @@ function validateCypherSchema(cypher: string): string[] {
   const relMatches = cypher.match(/\[(?:\w+)?:\s*([A-Z_]+)\]/g) || [];
   for (const match of relMatches) {
     const rel = match.match(/:\s*([A-Z_]+)/)?.[1];
-    if (rel && !VALID_RELATIONSHIPS.has(rel)) {
-      warnings.push(`Unknown relationship type "${rel}" — valid types: ${[...VALID_RELATIONSHIPS].slice(0, 5).join(', ')}...`);
+    if (rel && !getEffectiveRelationships().has(rel)) {
+      warnings.push(`Unknown relationship type "${rel}" — valid types: ${[...getEffectiveRelationships()].slice(0, 5).join(', ')}...`);
     }
   }
 
@@ -404,18 +417,14 @@ CYPHER RULES:
 - Always add LIMIT (max 50) to prevent huge result sets
 - For aggregation queries (COUNT, SUM, etc.) — put LIMIT AFTER the aggregation, NOT before
 - Never use window functions like ROW_NUMBER() OVER or any OVER() clause — Neo4j does not support them
+- ALWAYS alias returned columns with human-readable names: RETURN count(*) AS totalCount, NOT RETURN count(*)
+- ALWAYS alias computed values: RETURN sum(toFloat(bh.totalNetAmount)) AS totalRevenue
 - Use ORDER BY + LIMIT instead of window functions for ranking queries
 
 FIELD TYPE HINTS (critical for correct Cypher):
 - totalNetAmount, netAmount, amountInTransactionCurrency: These are STRING fields in Neo4j. You MUST use toFloat() before any arithmetic: sum(toFloat(x.totalNetAmount))
 - businessPartnerIsBlocked, billingDocumentIsCancelled: These are BOOLEAN fields. Use = true or = false, NOT string comparison
-- creationDate, billingDocumentDate, clearingDate, confirmedDeliveryDate: These are STRING dates stored as "YYYY-MM-DD" format.
-  - To compare with today: use date(x.fieldName) = date() (converts string to date, then compares with today's date)
-  - To compare with a specific date: use date(x.fieldName) >= date("2025-04-01")
-  - NEVER use substring(date(), ...) — date() returns a Date object, NOT a string. Use toString(date()) if you need it as a string.
-  - For date range filtering: WHERE date(x.creationDate) >= date("2025-04-01") AND date(x.creationDate) < date("2025-05-01")
-  - For STARTS WITH on date strings: use x.creationDate STARTS WITH "2025-04" (compare string to string, do NOT mix with date())
-- For date difference calculations: use duration.between(date(start), date(end)).days
+- Date fields (creationDate, billingDocumentDate, clearingDate etc.): See detailed date handling rules in the RELEVANT SCHEMA section below.
 - Customer ID links: Customer.id = SalesOrder.soldToParty = BillingHeader.soldToParty = Payment.customer
 - There is NO direct relationship between Customer and BillingHeader — use property match: WHERE bh.soldToParty = c.id
 - To join BillingHeader to Payment for clearing time: use Payment.accountingDocument = BillingHeader.accountingDocument

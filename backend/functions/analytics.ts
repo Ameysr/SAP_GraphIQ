@@ -308,10 +308,36 @@ export async function getDeliveryStatusBreakdown(): Promise<FunctionResult> {
 // ── INCOTERMS ANALYSIS ──────────────────────────────────────────────────────
 export async function getIncotermsAnalysis(): Promise<FunctionResult> {
   const cypher = `
-    MATCH (so:SalesOrder)
-    RETURN so.incotermsClassification AS incoterms, count(so) AS orderCount
+    MATCH (c:Customer)-[:PLACED]->(so:SalesOrder)
+    MATCH (c)-[:SELLS_THROUGH]->(csa:CustomerSalesArea)
+    WHERE csa.salesOrganization = so.salesOrganization
+    AND csa.distributionChannel = so.distributionChannel
+    WITH so.incotermsClassification AS incoterms,
+         csa.incotermsLocation1 AS location,
+         count(DISTINCT so) AS orderCount
+    RETURN incoterms, location, orderCount
     ORDER BY orderCount DESC
   `;
   const records = await runQuery(cypher, {});
   return wrapResult(records, 'getIncotermsAnalysis');
+}
+
+// ── ARCHIVING VS BLOCKED ANALYSIS ───────────────────────────────────────────
+export async function getArchivingVsBlockedAnalysis(): Promise<FunctionResult> {
+  const cypher = `
+    MATCH (c:Customer)
+    WITH c,
+         CASE WHEN c.isMarkedForArchiving = true THEN true ELSE false END AS markedForArchiving,
+         CASE WHEN c.businessPartnerIsBlocked = true THEN true ELSE false END AS isBlocked
+    WITH count(c) AS totalCustomers,
+         sum(CASE WHEN markedForArchiving THEN 1 ELSE 0 END) AS archivedCount,
+         sum(CASE WHEN isBlocked THEN 1 ELSE 0 END) AS blockedCount,
+         sum(CASE WHEN markedForArchiving AND isBlocked THEN 1 ELSE 0 END) AS bothCount,
+         sum(CASE WHEN NOT markedForArchiving AND NOT isBlocked THEN 1 ELSE 0 END) AS neitherCount,
+         collect(CASE WHEN NOT markedForArchiving AND NOT isBlocked THEN c.businessPartnerFullName ELSE null END) AS neitherNames
+    RETURN totalCustomers, archivedCount, blockedCount, bothCount, neitherCount,
+           [x IN neitherNames WHERE x IS NOT NULL] AS customersWithNeither
+  `;
+  const records = await runQuery(cypher, {});
+  return wrapResult(records, 'getArchivingVsBlockedAnalysis');
 }

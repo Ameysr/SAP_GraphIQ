@@ -117,6 +117,11 @@ const DETERMINISTIC_TEMPLATES: Record<string, (results: Record<string, unknown>[
     });
     return `**Blocked Customers with Active Orders** (${results.length} found)\n\n${lines.join('\n')}`;
   },
+  getArchivingVsBlockedAnalysis: (results) => {
+    const r = results[0] ?? {};
+    const neither = Array.isArray(r.customersWithNeither) ? (r.customersWithNeither as string[]).join(', ') : 'N/A';
+    return `**Business Partner Status Analysis** (${r.totalCustomers ?? 0} total customers)\n\n- **Marked for archiving**: ${r.archivedCount ?? 0} of ${r.totalCustomers ?? 0}\n- **Blocked**: ${r.blockedCount ?? 0} of ${r.totalCustomers ?? 0}\n- **Both archived AND blocked**: ${r.bothCount ?? 0}\n- **Neither archived nor blocked**: ${r.neitherCount ?? 0}${neither !== 'N/A' && neither ? ` (${neither})` : ''}`;
+  },
   getDebitCreditTotals: (results) => {
     const r = results[0] ?? {};
     return `**Journal Entry Summary**\n\n- **Total Debits**: INR ${Number(r.totalDebits).toLocaleString()}\n- **Total Credits**: INR ${Number(r.totalCredits).toLocaleString()}\n- **Net Balance**: INR ${Number(r.netBalance).toLocaleString()}\n- **Total Entries**: ${r.totalEntries}`;
@@ -180,6 +185,39 @@ const DETERMINISTIC_TEMPLATES: Record<string, (results: Record<string, unknown>[
   getPaymentCollectionRate: (results) => {
     const r = results[0] ?? {};
     return `**Payment Collection Rate**\n\n- **Total active billing value**: ${r.currency} ${Number(r.totalActiveBilled).toLocaleString()}\n- **Total collected (paid invoices)**: ${r.currency} ${Number(r.totalCollected).toLocaleString()}\n- **Outstanding**: ${r.currency} ${Number(r.outstanding).toLocaleString()}\n- **Collection rate**: **${r.collectionPct}%**`;
+  },
+  getO2CGraphSchemaDesign: (results) => {
+    const r = results[0] ?? {};
+    const nodes = Array.isArray(r.nodes) ? (r.nodes as Record<string, unknown>[]) : [];
+    const rels = Array.isArray(r.relationships) ? (r.relationships as Record<string, unknown>[]) : [];
+
+    const nodeLines = nodes.map((n, i) => {
+      // Filter out 'id' — every node has it as the primary key, listing it is redundant
+      const allProps = Array.isArray(n.keyProps) ? (n.keyProps as string[]) : [];
+      const businessProps = allProps.filter(p => p !== 'id');
+      const propsStr = businessProps.length > 0 ? businessProps.map(p => `\`${p}\``).join(', ') : '_(none)_';
+      return `${i + 1}. **${n.label}** — ${propsStr}`;
+    });
+
+    const relLines = rels.map((rel) => {
+      return `- (**${rel.from}**) -[:${rel.type}]→ (**${rel.to}**) — ${rel.cardinality}`;
+    });
+
+    let answer = `The SAP Order-to-Cash dataset contains **${nodes.length} distinct entity types (node types)**.  \nAll nodes share a common primary key: \`id\`.\n\n`;
+    answer += `**Node Types & Business Properties:**\n${nodeLines.join('\n')}\n\n`;
+    answer += `**Relationships (${rels.length} edge types):**\n${relLines.join('\n')}`;
+
+    if (r.edgePropertyNote) {
+      answer += `\n\n**Note:** ${r.edgePropertyNote}`;
+    }
+
+    return answer;
+  },
+  getEntityTypesSummary: (results) => {
+    const r = results[0] ?? {};
+    const types = Array.isArray(r.entityTypes) ? (r.entityTypes as string[]) : [];
+    const lines = types.map((t, i) => `${i + 1}. **${t}**`);
+    return `The SAP O2C graph contains **${r.entityTypeCount ?? types.length} distinct entity types**.\n\n${lines.join('\n')}`;
   },
 };
 
@@ -443,7 +481,9 @@ CRITICAL RULES:
   - Fields ending in "Amount", "Revenue", "Total", "Value", "Exposure", "Balance" are CURRENCY amounts (format with INR)
   - Fields ending in "Rate", "Percentage", "Pct", "Share" are PERCENTAGES (format with % symbol)
   - Fields ending in "Days", "DSO" are DURATIONS (format as "X days")
-- Respond ONLY with JSON: { "answer": "string", "nodesReferenced": ["id1", "id2"] }${validationWarning}`;
+YOU MUST RESPOND WITH ONLY VALID JSON. No markdown code fences, no explanation, no preamble.
+EXACT FORMAT: { "answer": "your formatted answer using Markdown", "nodesReferenced": ["id1", "id2"] }
+DO NOT wrap the JSON in a code block. DO NOT add any text before or after the JSON object.${validationWarning}`;
 
   const userPrompt = `User question: "${state.resolvedMessage}"
 TOTAL records found: ${totalRecordCount}
@@ -510,10 +550,9 @@ ${resultsStr}
     answer += ' (Note: this answer was dynamically generated — please verify against source data)';
   }
 
-  // Bug #18 fix: Surface validation warnings directly to the user
-  if (validationWarning) {
-    answer += `\n\n${validationWarning}`;
-  }
+  // Bug #18 fix: Validation warning is already injected into the LLM prompt,
+  // so the LLM will incorporate it in its answer. No need to append it again
+  // (was causing duplicate warnings in the response).
 
   const latencyMs = Date.now() - state.startTime;
 
