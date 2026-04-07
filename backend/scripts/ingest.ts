@@ -180,6 +180,7 @@ const NODE_CONFIGS: NodeConfig[] = [
       storageLocation: str(r.storageLocation),
       salesDocumentRjcnReason: str(r.salesDocumentRjcnReason),
       itemBillingBlockReason: str(r.itemBillingBlockReason),
+      salesOrderItemCategory: str(r.salesOrderItemCategory),
     }),
   },
   {
@@ -208,6 +209,7 @@ const NODE_CONFIGS: NodeConfig[] = [
       netWeight: str(r.netWeight),
       weightUnit: str(r.weightUnit),
       productHierarchy: str(r.productHierarchy),
+      productType: str(r.productType),
       isMarkedForArchiving: toBool(r.isMarkedForArchiving, false),
     }),
   },

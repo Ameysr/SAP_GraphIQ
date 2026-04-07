@@ -70,7 +70,7 @@ CRITICAL RULES:
 ⚠️ USE ONLY THE RELATIONSHIPS LISTED BELOW. DO NOT INVENT NEW ONES.
 
 SAP FIELD MAPPING HINTS:
-- Product "type" or "category" = productGroup field (e.g. "ZFS1", "ZF01", "ZPKG"), NOT productDescription (which is the human-readable name)
+- Product "type" or "product type" = productType field (e.g. "ZFS1", "ZF01", "ZPKG"), NOT productGroup (which is material group like "ZFG1001") and NOT productDescription (which is the human-readable name)
 - SalesOrderItem "item category" = salesOrderItemCategory field (e.g. "TAN"), NOT materialGroup (which is different — material groups are like "ZFG1001")
 - "marked for archiving" = isMarkedForArchiving (boolean), different from "blocked" = businessPartnerIsBlocked (boolean)`;
 
