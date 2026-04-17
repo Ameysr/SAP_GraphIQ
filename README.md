@@ -78,8 +78,8 @@ Input sanitization strips Cypher injection attempts (`CREATE`, `DELETE`, `DROP`,
 ## Evaluation Results
 
 ```
-  Accuracy        96%    useful-answer rate (correct + partial)
-  Exact Match     88%    numeric/entity-level precision
+  Accuracy        92%    useful answer rate (correct + partial)
+  Exact Match     40%    numeric/entity-level precision
   Avg Latency     1.8s   deterministic path (pre-built function)
   Avg Latency    12.4s   dynamic path (LLM-generated Cypher)
   LLM Cost       $0.00   all providers on free tier
