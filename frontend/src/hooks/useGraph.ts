@@ -1,38 +1,88 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { GraphData, GraphNodeDetails } from '../types/index';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
+
+export type LoadingStage = 
+  | 'waking'      // Pinging the backend to wake it up
+  | 'connecting'  // Backend responded, fetching graph
+  | 'rendering'   // Got graph data, building visualization
+  | 'ready'       // Done
+  | 'error';
 
 export function useGraph() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<LoadingStage>('waking');
+  const [pingAttempt, setPingAttempt] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchWithRetry = useCallback(async () => {
+    // Stage 1: Ping health endpoint to wake backend (lightweight, fast response once awake)
+    setStage('waking');
+    let backendAwake = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20; // ~60s max wait (3s per attempt)
 
-    async function fetchGraph() {
+    while (!backendAwake && attempts < MAX_ATTEMPTS) {
       try {
-        const res = await fetch(`${API_URL}/api/graph`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as GraphData;
-        if (!cancelled) {
-          setGraphData(data);
-          setLoading(false);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(`${API_URL}/health`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+          backendAwake = true;
         }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load graph');
-          setLoading(false);
-        }
+      } catch {
+        // Backend still cold, retry
+      }
+      if (!backendAwake) {
+        attempts++;
+        setPingAttempt(attempts);
+        await new Promise(r => setTimeout(r, 3000));
       }
     }
 
-    fetchGraph();
-    return () => { cancelled = true; };
+    if (!backendAwake) {
+      setError('Backend is taking too long to start. Please refresh in a minute.');
+      setStage('error');
+      setLoading(false);
+      return;
+    }
+
+    // Stage 2: Fetch graph data
+    setStage('connecting');
+    try {
+      const res = await fetch(`${API_URL}/api/graph`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as GraphData;
+      
+      // Stage 3: Brief rendering phase
+      setStage('rendering');
+      // Small delay to let the graph component mount smoothly
+      await new Promise(r => setTimeout(r, 300));
+      
+      setGraphData(data);
+      setStage('ready');
+      setLoading(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load graph');
+      setStage('error');
+      setLoading(false);
+    }
   }, []);
 
-  return { graphData, loading, error };
+  useEffect(() => {
+    let cancelled = false;
+    
+    if (!cancelled) {
+      fetchWithRetry();
+    }
+    
+    return () => { cancelled = true; };
+  }, [fetchWithRetry]);
+
+  return { graphData, loading, error, stage, pingAttempt };
 }
 
 export async function fetchNodeDetails(id: string): Promise<GraphNodeDetails | null> {

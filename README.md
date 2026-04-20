@@ -1,6 +1,6 @@
 # SAP Order to Cash Graph Intelligence System
 
-An AI powered system that converts natural language questions into accurate business insights over SAP O2C data using a graph database and multi step LLM pipeline.
+An AI-powered system that converts natural language questions into accurate business insights over SAP O2C data using a graph database and multi-step LLM pipeline.
 
 Built to handle real production challenges like hallucination, query safety, and accuracy.
 
@@ -11,10 +11,10 @@ Built to handle real production challenges like hallucination, query safety, and
 ## What It Does
 
 - Converts natural language → structured graph queries (Cypher) over SAP Order-to-Cash data
-- 85 pre built analytical functions with deterministic execution no hallucinated data
-- Handles complex multi part questions via automatic query decomposition
+- 85 pre-built analytical functions with deterministic execution — no hallucinated data
+- Handles complex multi-part questions via automatic query decomposition
 - Uses a hybrid deterministic + LLM approach: the LLM selects which function to call, not what data to return
-- Multi step retry and fallback strategies when queries fail never returns "no data found" without trying alternatives
+- Multi-step retry and fallback strategies when queries fail — never returns "no data found" without trying alternatives
 
 ---
 
@@ -29,7 +29,7 @@ After submission, I continued improving it with features like better query handl
 
 - Improved query handling and response accuracy (schema discovery, deterministic answer templates, query decomposition)
 - Added retry and fallback strategies for failed queries (escalating retries, smart fallback to nearest working function)
-- Enhanced routing precision with domain tuned embeddings, cross intent visibility, and schema aware validation
+- Enhanced routing precision with domain-tuned embeddings, cross-intent visibility, and schema-aware validation
 - Expanded analytical coverage with 18 new functions (DSO, AR aging, credit exposure, revenue leakage, and more)
 
 ---
@@ -37,19 +37,19 @@ After submission, I continued improving it with features like better query handl
 ## Key Features
 
 ### 1. Deterministic Query Routing
-85 typed Cypher functions across 5 intents (LOOKUP, TRAVERSE, AGGREGATE, DETECT, COMPARE). The LLM only selects which function to call no raw Cypher generation, no hallucinated data, no injection attacks. A semantic similarity router powered by domain tuned TF IDF embeddings hard locks the query to a function before the LLM even sees it.
+85 typed Cypher functions across 5 intents (LOOKUP, TRAVERSE, AGGREGATE, DETECT, COMPARE). The LLM only selects which function to call — no raw Cypher generation, no hallucinated data, no injection attacks. A semantic similarity router powered by domain-tuned TF-IDF embeddings hard-locks the query to a function before the LLM even sees it.
 
 ### 2. Schema Discovery Agent
-On startup, a Schema Discovery Agent auto introspects Neo4j to discover all node labels, relationship types, property names, data types, and sample values. This replaces hardcoded schema maps the LLM can generate Cypher for any property in the database without manual code updates when the data model changes.
+On startup, a Schema Discovery Agent auto-introspects Neo4j to discover all node labels, relationship types, property names, data types, and sample values. This replaces hardcoded schema maps — the LLM can generate Cypher for any property in the database without manual code updates when the data model changes.
 
 ### 3. Deterministic Answer Templates
-For 20+ known functions, answers are produced with **zero LLM involvement** eliminating number hallucination entirely. Pre built markdown templates format results (AR aging buckets, DSO days, credit exposure) with correct currency symbols, percentages, and counts. LLM formatting is only used for novel queries.
+For 20+ known functions, answers are produced with **zero LLM involvement** — eliminating number hallucination entirely. Pre-built markdown templates format results (AR aging buckets, DSO days, credit exposure) with correct currency symbols, percentages, and counts. LLM formatting is only used for novel queries.
 
 ### 4. Query Decomposition
-Complex multi part questions ("Show revenue AND delivery rates AND aging buckets") are automatically split into 2–4 independent sub queries. Each gets its own GraphRAG context, Cypher generation, and execution. Results are merged before formatting.
+Complex multi-part questions ("Show revenue AND delivery rates AND aging buckets") are automatically split into 2–4 independent sub-queries. Each gets its own GraphRAG context, Cypher generation, and execution. Results are merged before formatting.
 
 ### 5. Escalating Retry Strategy
-When Cypher generation fails, each retry uses a **fundamentally different approach** not the same context repeated:
+When Cypher generation fails, each retry uses a **fundamentally different approach** — not the same context repeated:
 
 | Retry | Strategy | Change |
 |-------|----------|--------|
@@ -61,17 +61,17 @@ When Cypher generation fails, each retry uses a **fundamentally different approa
 ### 6. Smart Fallback System
 When all retries fail, the system doesn't return "no data found." It scans plan candidates for the nearest working pre-built function, executes it, and prefixes the answer with: *"I couldn't answer your exact question directly, but here's the closest available analysis."*
 
-### 7. GraphRAG with Few Shot Retrieval
-For novel questions outside the function library, the system retrieves top K similar Cypher examples from a 78 query library, builds a minimal schema subset from the live database, and sends structured context to the LLM not a raw prompt.
+### 7. GraphRAG with Few-Shot Retrieval
+For novel questions outside the function library, the system retrieves top-K similar Cypher examples from a 78-query library, builds a minimal schema subset from the live database, and sends structured context to the LLM — not a raw prompt.
 
-### 8. Schema Aware Cypher Validation
-Before executing LLM-generated Cypher, the system validates it against the live schema: checks node labels, relationship types, and detects missing `toFloat()` on amount fields. Invalid queries are caught before hitting Neo4j, saving round-trips.
+### 8. Schema-Aware Cypher Validation
+Before executing LLM-generated Cypher, the system validates it against the live schema: checks node labels, relationship types, and detects missing `toFloat()` on amount fields. Invalid queries are caught before hitting Neo4j, saving round trips.
 
-### 9. Multi Layer Memory
-Redis backed conversation history + entity memory resolves pronouns across turns: *"Show me the order"* resolves to the exact ID discussed moments ago. Semantic cache (cosine similarity > 0.85) skips the full pipeline for repeated questions.
+### 9. Multi-Layer Memory
+Redis-backed conversation history + entity memory resolves pronouns across turns: *"Show me the order"* resolves to the exact ID discussed moments ago. Semantic cache (cosine similarity > 0.85) skips the full pipeline for repeated questions.
 
-### 10. Multi Layer Security
-Input sanitization strips Cypher injection attempts (`CREATE`, `DELETE`, `DROP`, `MERGE`). Rate limiting at 20/min per IP. Guardrail rejects off-topic queries before database access. Entity extraction uses regex to prevent prompt injection.
+### 10. Multi-Layer Security
+Cypher injection is prevented architecturally — the LLM selects pre-built functions, never generates raw write queries. A 5-layer guardrail (keyword blocklist, whitelist, intent classification, schema validation, and entity extraction) validates every query before database access. Rate limiting at 20/min per IP. Entity extraction uses regex to prevent prompt injection.
 
 ---
 
@@ -343,13 +343,15 @@ Dodge_Ai_Task/
 │   │   ├── llm.ts                # 3-tier LLM client (Groq/DeepSeek)
 │   │   ├── embedding.ts          # Domain-tuned TF-IDF embeddings
 │   │   ├── graphRAG.ts           # Few-shot retrieval + live schema
+│   │   ├── queryLibrary.ts       # 78-query Cypher example library for GraphRAG
 │   │   ├── schemaAgent.ts        # Auto-discovers Neo4j schema
 │   │   ├── questionPlans.ts      # Semantic plan matcher
 │   │   ├── contractVerifier.ts   # Output validation
 │   │   ├── semanticCache.ts      # Cosine similarity cache
 │   │   ├── memory.ts             # Conversation + entity memory
 │   │   ├── circuitBreaker.ts     # Provider failure tracking
-│   │   └── metrics.ts            # Latency, cost, usage metrics
+│   │   ├── metrics.ts            # Latency, cost, usage metrics
+│   │   └── logger.ts             # Observability logging
 │   ├── functions/
 │   │   ├── index.ts              # 85 functions across 5 intents
 │   │   ├── lookup.ts             # Entity lookups
@@ -363,20 +365,34 @@ Dodge_Ai_Task/
 │   │   ├── state.ts              # Pipeline state interface
 │   │   ├── index.ts              # Pipeline orchestrator
 │   │   └── nodes/                # 6 pipeline nodes
-│   └── routes/
-│       ├── chat.ts               # Chat API
-│       ├── graph.ts              # Graph visualization
-│       └── admin.ts              # Metrics dashboard
+│   │       ├── contextResolution.ts
+│   │       ├── guardrail.ts
+│   │       ├── entityExtractor.ts
+│   │       ├── functionSelector.ts
+│   │       ├── hybridExecutor.ts
+│   │       ├── answerFormatter.ts
+│   │       └── queryDecomposer.ts  # Sub-query decomposition module
+│   ├── routes/
+│   │   ├── chat.ts               # Chat API
+│   │   ├── graph.ts              # Graph visualization
+│   │   └── admin.ts              # Metrics dashboard
+│   ├── types/                    # TypeScript type definitions
+│   ├── utils/                    # Utility functions (cosine similarity, etc.)
+│   └── scripts/                  # Data ingestion and migration scripts
 │
 ├── frontend/
 │   ├── src/
+│   │   ├── main.tsx              # Vite entry point
 │   │   ├── App.tsx               # Main app with routing
 │   │   ├── index.css             # Dark glassmorphism theme
-│   │   └── components/
-│   │       ├── GraphView.tsx     # Force-directed graph
-│   │       ├── ChatPanel.tsx     # Chat interface
-│   │       ├── NodeInspector.tsx  # Node details
-│   │       └── AdminPanel.tsx    # Metrics dashboard
+│   │   ├── components/
+│   │   │   ├── GraphView.tsx      # Force-directed graph
+│   │   │   ├── ChatPanel.tsx      # Chat interface
+│   │   │   ├── FormattedMessage.tsx # Markdown answer renderer
+│   │   │   ├── NodeInspector.tsx   # Node details
+│   │   │   └── AdminPanel.tsx     # Metrics dashboard
+│   │   ├── hooks/                 # Custom React hooks
+│   │   └── types/                 # Frontend type definitions
 │
 └── sap-o2c-data/                 # Source SAP data (19 JSONL collections)
 ```

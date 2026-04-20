@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import GraphView from './components/GraphView';
 import ChatPanel from './components/ChatPanel';
@@ -7,10 +7,78 @@ import AdminPanel from './components/AdminPanel';
 import { fetchNodeDetails, useGraph } from './hooks/useGraph';
 import { useChat } from './hooks/useChat';
 import type { GraphNode, GraphNodeDetails } from './types/index';
+import type { LoadingStage } from './hooks/useGraph';
+import { useKeepAlive } from './hooks/useKeepAlive';
 import './index.css';
 
+/* ── Animated Loading Screen (graph area only) ── */
+function GraphLoadingScreen({ stage, pingAttempt }: { stage: LoadingStage; pingAttempt: number }) {
+  const stages: { key: LoadingStage; label: string; icon: string }[] = [
+    { key: 'waking', label: 'Waking up server', icon: '⚡' },
+    { key: 'connecting', label: 'Loading graph data', icon: '◆' },
+    { key: 'rendering', label: 'Building visualization', icon: '✦' },
+  ];
+
+  const currentIndex = stages.findIndex(s => s.key === stage);
+  // Estimate: each ping attempt ≈ 3s, max ~60s total
+  const estimatedProgress = stage === 'waking' 
+    ? Math.min(pingAttempt * 5, 60)
+    : stage === 'connecting' ? 70 
+    : 90;
+
+  return (
+    <div className="graph-loading-screen">
+      {/* Animated background orbs */}
+      <div className="loading-orb loading-orb-1" />
+      <div className="loading-orb loading-orb-2" />
+      <div className="loading-orb loading-orb-3" />
+
+      <div className="loading-content">
+        {/* Animated hexagon logo */}
+        <div className="loading-logo">
+          <div className="hex-ring">
+            <div className="hex-ring-inner" />
+          </div>
+        </div>
+
+        {/* Stage indicators */}
+        <div className="loading-stages">
+          {stages.map((s, i) => {
+            const isActive = i === currentIndex;
+            const isDone = i < currentIndex;
+            return (
+              <div key={s.key} className={`loading-stage ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
+                <div className="stage-icon">
+                  {isDone ? '✓' : isActive ? s.icon : '○'}
+                </div>
+                <span className="stage-label">{s.label}</span>
+                {isActive && <div className="stage-pulse" />}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Progress bar */}
+        <div className="loading-progress-track">
+          <div className="loading-progress-fill" style={{ width: `${estimatedProgress}%` }} />
+        </div>
+
+        {/* Context message */}
+        <p className="loading-hint">
+          {stage === 'waking' && pingAttempt === 0 && 'Connecting to backend...'}
+          {stage === 'waking' && pingAttempt > 0 && pingAttempt <= 3 && 'Free server is warming up — hang tight...'}
+          {stage === 'waking' && pingAttempt > 3 && pingAttempt <= 8 && 'Cold start in progress — this is normal for free tier...'}
+          {stage === 'waking' && pingAttempt > 8 && 'Almost there — initializing database connections...'}
+          {stage === 'connecting' && 'Server is ready — fetching graph nodes & relationships...'}
+          {stage === 'rendering' && 'Rendering force-directed graph...'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function MainView() {
-  const { graphData, loading, error } = useGraph();
+  const { graphData, loading, error, stage, pingAttempt } = useGraph();
   const { messages, isLoading, sendMessage, highlightedNodes } = useChat();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [nodeDetails, setNodeDetails] = useState<GraphNodeDetails | null>(null);
@@ -76,44 +144,44 @@ function MainView() {
     };
   }, [selectedNode]);
 
-  if (loading) {
-    return (
-      <div className="app-loading">
-        <div className="loader"></div>
-        <p>Loading graph data...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="app-error">
-        <h2>Connection Error</h2>
-        <p>{error}</p>
-        <p>Make sure the backend is running on port 3001</p>
-      </div>
-    );
-  }
-
   return (
     <div className="main-layout">
       <div className="graph-container">
-        {graphData && (
-          <GraphView
-            nodes={graphData.nodes}
-            edges={graphData.edges}
-            highlightedNodes={highlightedNodes}
-            onNodeClick={handleNodeClick}
-          />
-        )}
-        {selectedNode && (
-          <NodeInspector
-            node={nodeDetails?.node ?? selectedNode}
-            connections={nodeDetails?.connections ?? []}
-            onClose={handleCloseInspector}
-          />
+        {/* Show loading screen OR graph — never both */}
+        {loading ? (
+          error ? (
+            <div className="app-error">
+              <h2>Connection Error</h2>
+              <p>{error}</p>
+              <p>Make sure the backend is running on port 3001</p>
+              <button className="retry-btn" onClick={() => window.location.reload()}>
+                Retry
+              </button>
+            </div>
+          ) : (
+            <GraphLoadingScreen stage={stage} pingAttempt={pingAttempt} />
+          )
+        ) : (
+          <>
+            {graphData && (
+              <GraphView
+                nodes={graphData.nodes}
+                edges={graphData.edges}
+                highlightedNodes={highlightedNodes}
+                onNodeClick={handleNodeClick}
+              />
+            )}
+            {selectedNode && (
+              <NodeInspector
+                node={nodeDetails?.node ?? selectedNode}
+                connections={nodeDetails?.connections ?? []}
+                onClose={handleCloseInspector}
+              />
+            )}
+          </>
         )}
       </div>
+      {/* Chat loads immediately — no waiting for graph */}
       <div 
         className="chat-resizer" 
         onMouseDown={startResizing}
@@ -131,6 +199,9 @@ function MainView() {
 }
 
 export default function App() {
+  // Ping backend every 4 min to prevent Render free-tier spin-down
+  useKeepAlive();
+
   return (
     <BrowserRouter>
       <div className="app">

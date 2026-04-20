@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import { getHistory, getEntities } from '../services/memory.js';
 import { checkCache } from '../services/semanticCache.js';
 import { log } from '../services/logger.js';
@@ -40,15 +39,9 @@ function cacheKey(msg: string): string {
     .digest('hex');
 }
 
-const chatLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  message: { error: 'Too many requests — please wait a moment' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting is applied in server.ts (20/min per IP) — no duplicate limiter here.
 
-router.post('/', chatLimiter, async (req: Request, res: Response): Promise<void> => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   const sessionId = req.headers['x-session-id'] as string | undefined;
 
   if (!sessionId) {
