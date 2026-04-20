@@ -11,67 +11,38 @@ import type { LoadingStage } from './hooks/useGraph';
 import { useKeepAlive } from './hooks/useKeepAlive';
 import './index.css';
 
-/* ── Animated Loading Screen (graph area only) ── */
+/* ── Native Theme SAP Loading Card (graph area only) ── */
 function GraphLoadingScreen({ stage, pingAttempt }: { stage: LoadingStage; pingAttempt: number }) {
-  const stages: { key: LoadingStage; label: string; icon: string }[] = [
-    { key: 'waking', label: 'Waking up server', icon: '⚡' },
-    { key: 'connecting', label: 'Loading graph data', icon: '◆' },
-    { key: 'rendering', label: 'Building visualization', icon: '✦' },
-  ];
-
-  const currentIndex = stages.findIndex(s => s.key === stage);
-  // Estimate: each ping attempt ≈ 3s, max ~60s total
   const estimatedProgress = stage === 'waking' 
-    ? Math.min(pingAttempt * 5, 60)
-    : stage === 'connecting' ? 70 
-    : 90;
+    ? Math.min(pingAttempt * 5, 40)
+    : stage === 'connecting' ? 75 
+    : 95;
 
   return (
     <div className="graph-loading-screen">
-      {/* Animated background orbs */}
-      <div className="loading-orb loading-orb-1" />
-      <div className="loading-orb loading-orb-2" />
-      <div className="loading-orb loading-orb-3" />
-
-      <div className="loading-content">
-        {/* Animated hexagon logo */}
-        <div className="loading-logo">
-          <div className="hex-ring">
-            <div className="hex-ring-inner" />
-          </div>
-        </div>
-
-        {/* Stage indicators */}
-        <div className="loading-stages">
-          {stages.map((s, i) => {
-            const isActive = i === currentIndex;
-            const isDone = i < currentIndex;
-            return (
-              <div key={s.key} className={`loading-stage ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
-                <div className="stage-icon">
-                  {isDone ? '✓' : isActive ? s.icon : '○'}
-                </div>
-                <span className="stage-label">{s.label}</span>
-                {isActive && <div className="stage-pulse" />}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Progress bar */}
-        <div className="loading-progress-track">
-          <div className="loading-progress-fill" style={{ width: `${estimatedProgress}%` }} />
-        </div>
-
-        {/* Context message */}
-        <p className="loading-hint">
-          {stage === 'waking' && pingAttempt === 0 && 'Connecting to backend...'}
-          {stage === 'waking' && pingAttempt > 0 && pingAttempt <= 3 && 'Free server is warming up — hang tight...'}
-          {stage === 'waking' && pingAttempt > 3 && pingAttempt <= 8 && 'Cold start in progress — this is normal for free tier...'}
-          {stage === 'waking' && pingAttempt > 8 && 'Almost there — initializing database connections...'}
-          {stage === 'connecting' && 'Server is ready — fetching graph nodes & relationships...'}
-          {stage === 'rendering' && 'Rendering force-directed graph...'}
-        </p>
+      <div className="native-glass-loader">
+         <div className="ngl-header">
+           <span className="ngl-logo">⬡</span>
+           <span className="ngl-title">Graph Intelligence System</span>
+         </div>
+         <div className="ngl-body">
+           <div className="ngl-spinner"></div>
+           <div className="ngl-text">
+             <div className="ngl-status">
+                {stage === 'waking' ? 'Waking Environment...' : stage === 'connecting' ? 'Fetching SAP Schema...' : 'Compiling Visualization...'}
+             </div>
+             <div className="ngl-detail">
+                {stage === 'waking' && `Ping attempt ${pingAttempt} — Establishing connection to free tier cluster`}
+                {stage === 'connecting' && `Connection established. Loading O2C nodes & relationships`}
+                {stage === 'rendering' && `Schema retrieved. Constructing force-directed layout`}
+             </div>
+           </div>
+         </div>
+         <div className="ngl-footer">
+            <div className="ngl-progress">
+               <div className="ngl-progress-bar" style={{ width: `${estimatedProgress}%` }}></div>
+            </div>
+         </div>
       </div>
     </div>
   );

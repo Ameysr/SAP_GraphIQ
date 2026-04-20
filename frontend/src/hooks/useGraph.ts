@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GraphData, GraphNodeDetails } from '../types/index';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
@@ -72,14 +72,14 @@ export function useGraph() {
     }
   }, []);
 
+  const hasStarted = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
-    
-    if (!cancelled) {
-      fetchWithRetry();
-    }
-    
-    return () => { cancelled = true; };
+    // Guard against React.StrictMode double-mount (dev mode fires effects twice)
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+
+    fetchWithRetry();
   }, [fetchWithRetry]);
 
   return { graphData, loading, error, stage, pingAttempt };
