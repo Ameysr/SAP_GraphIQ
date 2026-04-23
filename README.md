@@ -15,23 +15,7 @@ Built to handle real production challenges like hallucination, query safety, and
 - Handles complex multi part questions via automatic query decomposition
 - Uses a hybrid deterministic + LLM approach: the LLM selects which function to call, not what data to return
 - Multi step retry and fallback strategies when queries fail never returns "no data found" without trying alternatives
-
----
-
-## Note
-
-This project was originally submitted as an assignment (deadline: March 26).
-After submission, I continued improving it with features like better query handling, retries, and accuracy improvements.
-
----
-
-## Improvements After Submission
-
-- Improved query handling and response accuracy (schema discovery, deterministic answer templates, query decomposition)
-- Added retry and fallback strategies for failed queries (escalating retries, smart fallback to nearest working function)
-- Enhanced routing precision with domain tuned embeddings, cross intent visibility, and schema aware validation
-- Expanded analytical coverage with 18 new functions (DSO, AR aging, credit exposure, revenue leakage, and more)
-
+  
 ---
 
 ## Key Features
