@@ -3,9 +3,6 @@
 An AI powered system that converts natural language questions into accurate business insights over SAP O2C data using a graph database and multi step LLM pipeline.
 
 Built to handle real production challenges like hallucination, query safety, and accuracy.
-
-> **Live Demo:** [https://dodge-ai-task-lilac.vercel.app/](https://dodge-ai-task-lilac.vercel.app/)
-
 ---
 
 ## What It Does
